@@ -14,10 +14,9 @@ let unlockPassword = '';
 let clickCount = 0;
 let unlocked = false;
 let lastActivity = Date.now();
-let pauseButton = null;
-let nextTabButton = null;
-let lockButton = null;
-let settingsButton = null;
+let menuButton = null;
+let menuContainer = null;
+let menuVisible = false;
 let isPaused = false;
 let timerDisplay = null;
 let currentTabTimer = null;
@@ -48,9 +47,21 @@ function initializeContentScript() {
 
 // Call initialization when content script loads
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeContentScript);
+  document.addEventListener('DOMContentLoaded', () => {
+    initializeContentScript();
+    // Force create button for testing
+    setTimeout(() => {
+      console.log('Force creating button after DOM ready');
+      createControlButtons();
+    }, 1000);
+  });
 } else {
   initializeContentScript();
+  // Force create button for testing
+  setTimeout(() => {
+    console.log('Force creating button immediately');
+    createControlButtons();
+  }, 1000);
 }
 
 chrome.runtime.onMessage.addListener((req) => {
@@ -69,17 +80,13 @@ chrome.runtime.onMessage.addListener((req) => {
     isPaused = false;
     currentTabTimer = req.currentTabTimer;
     schedule();
-    // Only create buttons/timer if they don't exist
-    if (!pauseButton) {
+    // Only create menu button if it doesn't exist
+    if (!menuButton) {
       createControlButtons();
     } else {
       updateButtonVisibility();
     }
-    if (!timerDisplay) {
-      createTimerDisplay();
-    } else {
-      updateTimerDisplay();
-    }
+    createTimerDisplay(); // This now just updates the menu button
     if (unlocked) {
       startInactivityTimer();
     }
@@ -104,13 +111,11 @@ chrome.runtime.onMessage.addListener((req) => {
   } else if (req.action === 'exitFullscreen') {
     exitFullscreen();
   } else if (req.action === 'tabBecameActive') {
-    // Don't create new buttons/timer if they already exist
-    if (!pauseButton) {
+    // Don't create new menu button if it already exists
+    if (!menuButton) {
       createControlButtons();
     }
-    if (!timerDisplay) {
-      createTimerDisplay();
-    }
+    createTimerDisplay(); // This now just updates the menu button
     if (unlocked) {
       startInactivityTimer();
     }
@@ -177,19 +182,17 @@ const block = (e) => {
   // Always allow clicks on control buttons
   if (e.target) {
     // Direct ID check
-    if (e.target.id === 'kiosk-pause-button' ||
-        e.target.id === 'kiosk-next-button' ||
-        e.target.id === 'kiosk-lock-button' ||
-        e.target.id === 'kiosk-settings-button') {
+    if (e.target.id === 'kiosk-menu-button' ||
+        e.target.id === 'kiosk-menu-container' ||
+        e.target.classList.contains('kiosk-menu-btn')) {
       return;
     }
 
     // Check if target has closest method (only elements have this method)
     if (typeof e.target.closest === 'function') {
-      if (e.target.closest('#kiosk-pause-button') ||
-          e.target.closest('#kiosk-next-button') ||
-          e.target.closest('#kiosk-lock-button') ||
-          e.target.closest('#kiosk-settings-button')) {
+      if (e.target.closest('#kiosk-menu-button') ||
+          e.target.closest('#kiosk-menu-container') ||
+          e.target.closest('.kiosk-menu-btn')) {
         return;
       }
     }
@@ -313,174 +316,230 @@ function showIncorrectPasswordNotification() {
 
 
 function createControlButtons() {
-  // Check if buttons already exist in DOM
-  const existingPause = document.getElementById('kiosk-pause-button');
-  const existingNext = document.getElementById('kiosk-next-button');
-  const existingLock = document.getElementById('kiosk-lock-button');
-  const existingSettings = document.getElementById('kiosk-settings-button');
+  console.log('createControlButtons called, start:', start, 'kiosk running checks');
 
-  // If any button exists, just update references and visibility
-  if (existingPause || existingNext || existingLock || existingSettings) {
-    pauseButton = existingPause;
-    nextTabButton = existingNext;
-    lockButton = existingLock;
-    settingsButton = existingSettings;
-    updateButtonVisibility();
+  // Check if menu button already exists
+  const existingMenu = document.getElementById('kiosk-menu-button');
+  if (existingMenu) {
+    console.log('Menu button already exists, updating');
+    menuButton = existingMenu;
+    updateMenuButton();
     return;
   }
 
-  // Always clean up existing buttons first
+  // Always clean up existing elements first
   removeControlButtons();
 
-  if (!start) return;
+  // Create button even without start time for testing
+  console.log('Creating new menu button (forcing creation for debugging)');
 
-  // Create pause button (always visible)
-  pauseButton = document.createElement('div');
-  pauseButton.id = 'kiosk-pause-button';
-  pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
-  pauseButton.style.cssText = `
+  // Create main round menu button with timer
+  menuButton = document.createElement('div');
+  menuButton.id = 'kiosk-menu-button';
+  menuButton.style.cssText = `
     position: fixed;
-    bottom: 10px;
-    left: 10px;
-    background: ${isPaused ? 'linear-gradient(135deg, #28a745 0%, #20c997 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
     color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    z-index: 1000000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 2147483647;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     transition: all 0.3s ease;
     user-select: none;
-    min-width: 80px;
     text-align: center;
     pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 3px solid rgba(255, 255, 255, 0.3);
   `;
-  pauseButton.onclick = togglePause; // Use onclick instead of addEventListener to avoid duplicates
-  document.body.appendChild(pauseButton);
 
-  // Create next tab button (always visible)
-  nextTabButton = document.createElement('div');
-  nextTabButton.id = 'kiosk-next-button';
-  nextTabButton.textContent = 'Next Tab';
-  nextTabButton.style.cssText = `
+  // Create timer display inside the button
+  const timerContent = document.createElement('div');
+  timerContent.id = 'menu-timer-display';
+  timerContent.style.cssText = `
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 2px;
+  `;
+  timerContent.textContent = '00:30';
+
+  const statusText = document.createElement('div');
+  statusText.id = 'menu-status-text';
+  statusText.style.cssText = `
+    font-size: 8px;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  `;
+  statusText.textContent = isPaused ? 'PAUSED' : 'MENU';
+
+  menuButton.appendChild(timerContent);
+  menuButton.appendChild(statusText);
+  menuButton.onclick = toggleMenu;
+
+  // Create menu container (hidden by default)
+  createMenuContainer();
+
+  document.body.appendChild(menuButton);
+  console.log('Menu button added to DOM');
+  updateMenuButton();
+}
+
+function createMenuContainer() {
+  menuContainer = document.createElement('div');
+  menuContainer.id = 'kiosk-menu-container';
+  menuContainer.style.cssText = `
     position: fixed;
-    bottom: 10px;
-    left: 100px;
-    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    z-index: 1000000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    user-select: none;
-    min-width: 80px;
-    text-align: center;
-    pointer-events: auto;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    opacity: 0;
+    background: rgba(0, 0, 0, 0.9);
+    border-radius: 20px;
+    padding: 15px;
+    z-index: 999999;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
   `;
-  nextTabButton.onclick = switchToNextTab; // Use onclick instead of addEventListener to avoid duplicates
-  document.body.appendChild(nextTabButton);
 
-  // Create lock button (only visible when unlocked)
-  lockButton = document.createElement('div');
-  lockButton.id = 'kiosk-lock-button';
-  lockButton.textContent = 'Lock';
-  lockButton.style.cssText = `
-    position: fixed;
-    bottom: 10px;
-    left: 190px;
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    z-index: 1000000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    user-select: none;
-    min-width: 80px;
-    text-align: center;
-    pointer-events: auto;
-    display: ${unlocked ? 'block' : 'none'};
-  `;
-  lockButton.onclick = performLock; // Use onclick instead of addEventListener to avoid duplicates
-  document.body.appendChild(lockButton);
+  // Create menu buttons
+  const buttons = [
+    { id: 'pause', text: isPaused ? '▶️ Resume' : '⏸️ Pause', action: togglePause },
+    { id: 'next', text: '⏭️ Next', action: switchToNextTab },
+    ...(unlocked ? [
+      { id: 'lock', text: '🔒 Lock', action: performLock },
+      { id: 'exit', text: '❌ Exit', action: exitKiosk }
+    ] : [])
+  ];
 
-  // Create exit button (only visible when unlocked)
-  settingsButton = document.createElement('div');
-  settingsButton.id = 'kiosk-settings-button';
-  settingsButton.textContent = 'Exit';
-  settingsButton.style.cssText = `
-    position: fixed;
-    bottom: 10px;
-    left: 280px;
-    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    z-index: 1000000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    user-select: none;
-    min-width: 80px;
-    text-align: center;
-    pointer-events: auto;
-    display: ${unlocked ? 'block' : 'none'};
-  `;
-  settingsButton.onclick = exitKiosk; // Use onclick instead of addEventListener to avoid duplicates
-  document.body.appendChild(settingsButton);
+  buttons.forEach(btn => {
+    const button = document.createElement('div');
+    button.className = 'kiosk-menu-btn';
+    button.textContent = btn.text;
+    button.style.cssText = `
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+      white-space: nowrap;
+      min-width: 70px;
+      text-align: center;
+    `;
 
-  updateButtonVisibility();
+    button.onmouseover = () => {
+      button.style.transform = 'scale(1.05)';
+      button.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+    };
+
+    button.onmouseout = () => {
+      button.style.transform = 'scale(1)';
+      button.style.boxShadow = 'none';
+    };
+
+    button.onclick = () => {
+      btn.action();
+      hideMenu();
+    };
+
+    menuContainer.appendChild(button);
+  });
+
+  document.body.appendChild(menuContainer);
 }
 
 function removeControlButtons() {
-  if (pauseButton && pauseButton.parentNode) {
-    pauseButton.parentNode.removeChild(pauseButton);
-    pauseButton = null;
+  if (menuButton && menuButton.parentNode) {
+    menuButton.parentNode.removeChild(menuButton);
+    menuButton = null;
   }
-  if (nextTabButton && nextTabButton.parentNode) {
-    nextTabButton.parentNode.removeChild(nextTabButton);
-    nextTabButton = null;
+  if (menuContainer && menuContainer.parentNode) {
+    menuContainer.parentNode.removeChild(menuContainer);
+    menuContainer = null;
   }
-  if (lockButton && lockButton.parentNode) {
-    lockButton.parentNode.removeChild(lockButton);
-    lockButton = null;
-  }
-  if (settingsButton && settingsButton.parentNode) {
-    settingsButton.parentNode.removeChild(settingsButton);
-    settingsButton = null;
-  }
+  menuVisible = false;
 }
 
 function updateButtonVisibility() {
-  if (pauseButton) {
-    pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
-    pauseButton.style.background = isPaused ?
-      'linear-gradient(135deg, #28a745 0%, #20c997 100%)' :
-      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+  updateMenuButton();
+}
+
+function updateMenuButton() {
+  if (!menuButton) return;
+
+  const timerContent = document.getElementById('menu-timer-display');
+  const statusText = document.getElementById('menu-status-text');
+
+  if (timerContent && currentTabTimer) {
+    const minutes = Math.floor(currentTabTimer.remaining / 60);
+    const seconds = currentTabTimer.remaining % 60;
+    timerContent.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  if (lockButton) {
-    lockButton.style.display = unlocked ? 'block' : 'none';
+  if (statusText) {
+    statusText.textContent = isPaused ? 'PAUSED' : 'MENU';
   }
 
-  if (settingsButton) {
-    settingsButton.style.display = unlocked ? 'block' : 'none';
+  // Update button color based on state
+  const isLocked = !unlocked;
+  const bgColor = isPaused
+    ? 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)'
+    : isLocked
+      ? 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'
+      : 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+
+  menuButton.style.background = bgColor;
+}
+
+function toggleMenu() {
+  if (menuVisible) {
+    hideMenu();
+  } else {
+    showMenu();
   }
+}
+
+function showMenu() {
+  if (!menuContainer) return;
+
+  // Recreate menu to update button states
+  if (menuContainer.parentNode) {
+    menuContainer.parentNode.removeChild(menuContainer);
+  }
+  createMenuContainer();
+
+  menuVisible = true;
+  menuContainer.style.pointerEvents = 'auto';
+  menuContainer.style.transform = 'translateX(-50%) scale(1)';
+  menuContainer.style.opacity = '1';
+}
+
+function hideMenu() {
+  if (!menuContainer) return;
+
+  menuVisible = false;
+  menuContainer.style.pointerEvents = 'none';
+  menuContainer.style.transform = 'translateX(-50%) scale(0)';
+  menuContainer.style.opacity = '0';
 }
 
 function togglePause() {
@@ -588,86 +647,17 @@ function stopInactivityTimer() {
 }
 
 function createTimerDisplay() {
-  // Check if timer already exists in DOM
-  const existingTimer = document.getElementById('kiosk-timer-display');
-  if (existingTimer) {
-    timerDisplay = existingTimer;
-    updateTimerDisplay();
-    return;
-  }
-
-  // Always remove existing timer first to prevent duplicates
-  removeTimerDisplay();
-
-  // Only create timer if we have an active kiosk session
-  if (!start || !currentTabTimer) return;
-
-  timerDisplay = document.createElement('div');
-  timerDisplay.id = 'kiosk-timer-display';
-  timerDisplay.style.cssText = `
-    position: fixed;
-    bottom: 10px;
-    right: 10px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 16px 20px;
-    border-radius: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-weight: 600;
-    z-index: 999999;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    user-select: none;
-    min-width: 140px;
-    text-align: center;
-    pointer-events: none;
-  `;
-
-  // Create timer content
-  timerDisplay.innerHTML = `
-    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">NEXT SWITCH</div>
-    <div id="timer-time" style="font-size: 24px; font-weight: bold; line-height: 1;"></div>
-    <div style="width: 100%; height: 3px; background: rgba(255,255,255,0.3); border-radius: 2px; margin-top: 8px; overflow: hidden;">
-      <div id="timer-progress" style="height: 100%; background: white; transition: width 0.3s ease; width: 0%;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(timerDisplay);
-  updateTimerDisplay();
+  // Timer is now integrated into the menu button - no separate display needed
+  updateMenuButton();
 }
 
 function removeTimerDisplay() {
-  if (timerDisplay && timerDisplay.parentNode) {
-    timerDisplay.parentNode.removeChild(timerDisplay);
-    timerDisplay = null;
-  }
+  // Timer is now integrated into the menu button - no separate display to remove
 }
 
 function updateTimerDisplay() {
-  if (!timerDisplay || !currentTabTimer) return;
-
-  const timeEl = document.getElementById('timer-time');
-  const progressEl = document.getElementById('timer-progress');
-
-  if (!timeEl || !progressEl) return;
-
-  // Format time as MM:SS
-  const minutes = Math.floor(currentTabTimer.remaining / 60);
-  const seconds = currentTabTimer.remaining % 60;
-  timeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-  // Update progress
-  const progress = ((currentTabTimer.total - currentTabTimer.remaining) / currentTabTimer.total) * 100;
-  progressEl.style.width = `${Math.max(0, Math.min(100, progress))}%`;
-
-  // Update paused state
-  if (isPaused || currentTabTimer.paused) {
-    timerDisplay.style.background = 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)';
-    timeEl.parentElement.querySelector('div').textContent = 'PAUSED';
-  } else {
-    timerDisplay.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-    timeEl.parentElement.querySelector('div').textContent = 'NEXT SWITCH';
-  }
+  // Timer is now integrated into the menu button
+  updateMenuButton();
 }
 
 function showPauseNotification() {
@@ -817,6 +807,13 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('click', (e) => {
   trackActivity(); // For background script
   trackUserActivity(); // For inactivity timer
+
+  // Hide menu if clicking outside of menu elements
+  if (menuVisible &&
+      !e.target.closest('#kiosk-menu-button') &&
+      !e.target.closest('#kiosk-menu-container')) {
+    hideMenu();
+  }
 });
 
 const keepAlive = () => {
