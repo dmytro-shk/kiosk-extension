@@ -3,7 +3,7 @@
   "name": "Kiosk Tab Rotator Pro",
   "version": "0.1.0",
   "description": "Automatically rotates between multiple tabs with individual timers and advanced control features",
-  "permissions": ["tabs", "storage", "scripting", "webNavigation"],
+  "permissions": ["tabs", "storage", "scripting", "webNavigation", "windows"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

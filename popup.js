@@ -15,11 +15,8 @@ const el = {};
 
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize elements
-  ['saveBtn', 'startBtn', 'stopBtn', 'status', 'clickLockStatus', 'clickLockText',
-   'addLinkBtn', 'linksContainer', 'pauseBtn', 'continueBtn',
-   'kioskMode', 'autoStart', 'hoverOnlyMode', 'unlockPassword',
-   'debugBtn', 'clearBtn', 'floatingTimer', 'floatingTimerTime',
-   'floatingTimerLink', 'floatingTimerProgress'].forEach(id => {
+  ['saveBtn', 'startBtn', 'stopBtn', 'status', 'addLinkBtn', 'linksContainer',
+   'kioskMode', 'autoStart', 'hoverOnlyMode', 'unlockPassword'].forEach(id => {
     el[id] = document.getElementById(id);
   });
 
@@ -27,25 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
   el.saveBtn.addEventListener('click', save);
   el.startBtn.addEventListener('click', () => msg('start'));
   el.stopBtn.addEventListener('click', () => msg('stop'));
-  el.pauseBtn.addEventListener('click', () => msg('pause'));
-  el.continueBtn.addEventListener('click', () => msg('continue'));
   el.addLinkBtn.addEventListener('click', addLink);
 
-  // Debug buttons
-  if (el.debugBtn) {
-    el.debugBtn.addEventListener('click', debugStorage);
-  }
-  if (el.clearBtn) {
-    el.clearBtn.addEventListener('click', clearStorage);
-  }
 
   // Track user activity for auto-continue
   document.addEventListener('click', updateActivity);
   document.addEventListener('keydown', updateActivity);
   document.addEventListener('mousemove', updateActivity);
-
-  // Setup floating timer position cycling
-  setupFloatingTimer();
 
   load();
   update();
@@ -63,54 +48,6 @@ function checkAutoResume() {
   }
 }
 
-function setupFloatingTimer() {
-  if (!el.floatingTimer) return;
-
-  const positions = ['bottom-right', 'bottom-left', 'top-left', 'top-right'];
-  let currentPosition = 0;
-
-  // Load saved position
-  const savedPosition = localStorage.getItem('floatingTimerPosition');
-  if (savedPosition && positions.includes(savedPosition)) {
-    currentPosition = positions.indexOf(savedPosition);
-    el.floatingTimer.className = 'floating-timer ' + savedPosition;
-  }
-
-  // Click to cycle through positions
-  el.floatingTimer.addEventListener('click', (e) => {
-    e.stopPropagation();
-    currentPosition = (currentPosition + 1) % positions.length;
-    const newPosition = positions[currentPosition];
-
-    // Remove all position classes
-    positions.forEach(pos => el.floatingTimer.classList.remove(pos));
-
-    // Add new position class
-    el.floatingTimer.classList.add(newPosition);
-
-    // Save position preference
-    localStorage.setItem('floatingTimerPosition', newPosition);
-
-    // Show a tooltip
-    const tooltip = document.createElement('div');
-    tooltip.textContent = 'Click to move';
-    tooltip.style.cssText = `
-      position: absolute;
-      bottom: -25px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.8);
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      white-space: nowrap;
-      pointer-events: none;
-    `;
-    el.floatingTimer.appendChild(tooltip);
-    setTimeout(() => tooltip.remove(), 1000);
-  });
-}
 
 function load() {
   console.log('Loading config from storage...');
@@ -278,12 +215,6 @@ function createLinkElement(link, index) {
       </div>
     </div>
 
-    <div class="link-timers">
-      <div class="timer-display" id="timer-${link.id}">Ready</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progress-${link.id}" style="width: 0%"></div>
-      </div>
-    </div>
   `;
 
   // Add event listeners after creating the element
@@ -435,20 +366,15 @@ function update() {
       }
       el.startBtn.disabled = true;
       el.stopBtn.disabled = false;
-      el.pauseBtn.disabled = false;
-      el.continueBtn.disabled = false;
 
-      // Update click lock status
-      el.clickLockStatus.style.display = 'block';
+      // Show unlock status in main status
       if (r.links && r.links[r.currentTabIndex]) {
         const currentLink = r.links[r.currentTabIndex];
         const left = currentLink.blockClicksAfter - r.elapsedTime;
         if (left > 0) {
-          el.clickLockStatus.className = 'status unlocked';
-          el.clickLockText.textContent = `Unlocked (${left}s)`;
+          el.status.innerHTML += ' | <span style="color: #4CAF50;">Unlocked</span>';
         } else {
-          el.clickLockStatus.className = 'status locked';
-          el.clickLockText.textContent = 'LOCKED';
+          el.status.innerHTML += ' | <span style="color: #f44336;">Locked</span>';
         }
       }
     } else {
@@ -456,87 +382,28 @@ function update() {
       el.status.innerHTML = 'Status: <strong>Stopped</strong>';
       el.startBtn.disabled = false;
       el.stopBtn.disabled = true;
-      el.pauseBtn.disabled = true;
-      el.continueBtn.disabled = true;
-      el.clickLockStatus.style.display = 'none';
-
-      // Hide floating timer when stopped
-      el.floatingTimer.classList.remove('active');
     }
 
-    // Update individual link timers
-    updateLinkTimers(r);
+    // Update active link highlighting
+    updateActiveLinkHighlight(r);
 
     state.isPaused = r.isPaused || false;
   });
 }
 
-function updateLinkTimers(status) {
+function updateActiveLinkHighlight(status) {
   if (!status.isRunning || !status.linkTimers) return;
 
-  // Update floating timer for current active link
-  if (status.currentTabIndex >= 0 && status.linkTimers[status.currentTabIndex]) {
-    const currentTimer = status.linkTimers[status.currentTabIndex];
-    const currentLink = state.links[status.currentTabIndex];
+  // Update active link highlighting only
+  state.links.forEach((link, index) => {
+    const linkEl = document.getElementById(`link-${link.id}`);
+    if (!linkEl) return;
 
-    // Show floating timer
-    el.floatingTimer.classList.add('active');
-
-    // Format time as MM:SS
-    const minutes = Math.floor(currentTimer.remaining / 60);
-    const seconds = currentTimer.remaining % 60;
-    el.floatingTimerTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-    // Show current link info
-    if (currentLink) {
-      try {
-        const url = new URL(currentLink.url);
-        el.floatingTimerLink.textContent = `Link ${status.currentTabIndex + 1}: ${url.hostname}`;
-      } catch (e) {
-        el.floatingTimerLink.textContent = `Link ${status.currentTabIndex + 1}`;
-      }
-    }
-
-    // Update progress
-    const progress = ((currentTimer.total - currentTimer.remaining) / currentTimer.total) * 100;
-    el.floatingTimerProgress.style.width = `${Math.max(0, Math.min(100, progress))}%`;
-
-    // Update paused state
-    if (status.isPaused) {
-      el.floatingTimer.classList.add('paused');
-    } else {
-      el.floatingTimer.classList.remove('paused');
-    }
-  }
-
-  status.linkTimers.forEach((timer, index) => {
-    const timerEl = document.getElementById(`timer-${state.links[index]?.id}`);
-    const progressEl = document.getElementById(`progress-${state.links[index]?.id}`);
-    const linkEl = document.getElementById(`link-${state.links[index]?.id}`);
-
-    if (!timerEl || !progressEl || !linkEl) return;
-
-    // Update active state
     if (index === status.currentTabIndex) {
       linkEl.classList.add('active');
     } else {
       linkEl.classList.remove('active');
     }
-
-    // Update timer display
-    if (status.isPaused) {
-      timerEl.textContent = `Paused (${timer.remaining}s)`;
-      timerEl.classList.add('paused');
-      progressEl.classList.add('paused');
-    } else {
-      timerEl.textContent = `${timer.remaining}s remaining`;
-      timerEl.classList.remove('paused');
-      progressEl.classList.remove('paused');
-    }
-
-    // Update progress bar
-    const progress = ((timer.total - timer.remaining) / timer.total) * 100;
-    progressEl.style.width = `${Math.max(0, Math.min(100, progress))}%`;
   });
 }
 
@@ -549,42 +416,5 @@ function valid(url) {
   }
 }
 
-// Debug functions
-function debugStorage() {
-  console.log('=== Storage Debug ===');
-  console.log('Current state:', state);
-
-  chrome.storage.sync.get(null, (items) => {
-    if (chrome.runtime.lastError) {
-      console.error('Error reading storage:', chrome.runtime.lastError);
-      alert('Storage error: ' + chrome.runtime.lastError.message);
-    } else {
-      console.log('All storage items:', items);
-      alert('Check console for storage debug info');
-    }
-  });
-
-  // Check storage quota
-  chrome.storage.sync.getBytesInUse(null, (bytesInUse) => {
-    console.log('Storage bytes in use:', bytesInUse);
-    console.log('Storage quota:', chrome.storage.sync.QUOTA_BYTES);
-    console.log('Percentage used:', (bytesInUse / chrome.storage.sync.QUOTA_BYTES * 100).toFixed(2) + '%');
-  });
-}
-
-function clearStorage() {
-  if (confirm('Are you sure you want to clear all saved settings?')) {
-    chrome.storage.sync.clear(() => {
-      if (chrome.runtime.lastError) {
-        console.error('Failed to clear storage:', chrome.runtime.lastError);
-        alert('Failed to clear storage: ' + chrome.runtime.lastError.message);
-      } else {
-        console.log('Storage cleared');
-        alert('Storage cleared! Reloading...');
-        location.reload();
-      }
-    });
-  }
-}
 
 // Functions are now accessed via event listeners, not global window object

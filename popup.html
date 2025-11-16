@@ -18,15 +18,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .btn-primary{background:#4CAF50;color:#fff}.btn-primary:hover:not(:disabled){background:#45a049}
 .btn-danger{background:#f44336;color:#fff}.btn-danger:hover:not(:disabled){background:#da190b}
 .btn-secondary{background:#2196F3;color:#fff}.btn-secondary:hover:not(:disabled){background:#0b7dda}
-.btn-success{background:#28a745;color:#fff}.btn-success:hover:not(:disabled){background:#218838}
-.btn-warning{background:#ffc107;color:#000}.btn-warning:hover:not(:disabled){background:#e0a800}
 .btn-small{padding:5px 10px;font-size:12px;min-width:auto;flex:none}
 .status{padding:10px;border-radius:4px;margin-bottom:15px;font-size:13px}
 .status.running{background:#e7f5e7;color:#2e7d32;border:1px solid #4caf50}
 .status.stopped{background:#fef7e0;color:#f57c00;border:1px solid #ffa726}
 .status.paused{background:#fff3e0;color:#f57c00;border:1px solid #ffb74d}
-.status.locked{background:#ffebee;color:#c62828;border:1px solid #ef5350}
-.status.unlocked{background:#e8f5e9;color:#2e7d32;border:1px solid #66bb6a}
 .help-text{font-size:11px;color:#777;margin-top:3px}
 .info-box{background:#e3f2fd;padding:12px;border-radius:4px;margin-bottom:15px;font-size:12px;color:#1565c0}
 .info-box strong{display:block;margin-bottom:5px}
@@ -44,17 +40,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .link-controls{display:flex;gap:8px}
 .link-url{margin-bottom:12px}
 .link-settings{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.link-timers{padding:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:6px;margin-top:10px}
-.timer-display{font-weight:700;color:#fff;font-size:14px;margin-bottom:5px}
-.timer-display.paused{color:#ffc107}
-.progress-bar{width:100%;height:8px;background:rgba(255,255,255,0.3);border-radius:4px;overflow:hidden;margin:8px 0}
-.progress-fill{height:100%;background:#fff;transition:width 0.3s ease;border-radius:4px;box-shadow:0 0 10px rgba(255,255,255,0.5)}
-.progress-fill.paused{background:#ffc107}
-
-/* Timer controls */
-.timer-controls{display:flex;gap:8px;margin-top:8px}
-.timer-controls button{background:rgba(255,255,255,0.9);color:#333;border:none;font-weight:600}
-.timer-controls button:hover{background:#fff}
 .global-controls{background:#f8f9fa;padding:12px;border-radius:6px;margin-bottom:15px}
 .global-controls h3{font-size:14px;margin-bottom:8px;color:#333}
 .control-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
@@ -91,94 +76,20 @@ button:disabled{opacity:.5;cursor:not-allowed}
   box-shadow:0 -2px 8px rgba(0,0,0,0.1);
 }
 
-/* Floating Timer Display */
-.floating-timer{
-  position:fixed;
-  bottom:80px;
-  right:20px;
-  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-  color:#fff;
-  padding:12px 16px;
-  border-radius:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.3);
-  z-index:1000;
-  min-width:120px;
-  text-align:center;
-  display:none;
-  cursor:move;
-  transition:all 0.3s ease;
-}
-.floating-timer:hover{
-  transform:scale(1.05);
-  box-shadow:0 6px 16px rgba(0,0,0,0.4);
-}
-.floating-timer.active{display:block}
-.floating-timer.top-left{top:80px;left:20px;bottom:auto;right:auto}
-.floating-timer.top-right{top:80px;right:20px;bottom:auto;left:auto}
-.floating-timer.bottom-left{bottom:80px;left:20px;top:auto;right:auto}
-.floating-timer.bottom-right{bottom:80px;right:20px;top:auto;left:auto}
-.floating-timer-label{
-  font-size:11px;
-  text-transform:uppercase;
-  opacity:0.9;
-  margin-bottom:4px;
-  letter-spacing:0.5px;
-}
-.floating-timer-time{
-  font-size:24px;
-  font-weight:bold;
-  line-height:1;
-}
-.floating-timer-link{
-  font-size:10px;
-  opacity:0.8;
-  margin-top:4px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.floating-timer.paused{
-  background:linear-gradient(135deg,#ffc107 0%,#ff9800 100%);
-}
-.floating-timer-progress{
-  width:100%;
-  height:3px;
-  background:rgba(255,255,255,0.3);
-  border-radius:2px;
-  overflow:hidden;
-  margin-top:8px;
-}
-.floating-timer-progress-fill{
-  height:100%;
-  background:#fff;
-  transition:width 0.3s ease;
-}
 </style>
 </head>
 <body>
 
-<!-- Floating Timer Overlay -->
-<div id="floatingTimer" class="floating-timer">
-  <div class="floating-timer-label">Next Switch</div>
-  <div id="floatingTimerTime" class="floating-timer-time">--:--</div>
-  <div id="floatingTimerLink" class="floating-timer-link">Link 1</div>
-  <div class="floating-timer-progress">
-    <div id="floatingTimerProgress" class="floating-timer-progress-fill" style="width:0%"></div>
-  </div>
-</div>
 
 <!-- Fixed Header Section -->
 <div class="header-section">
   <h2 style="margin:0 0 10px 0">Kiosk Tab Rotator</h2>
-  <div id="status" class="status stopped" style="margin-bottom:10px">Status: <strong>Stopped</strong></div>
-  <div id="clickLockStatus" class="status" style="display:none;margin-bottom:10px">Click Lock: <strong id="clickLockText">Unlocked</strong></div>
+  <div id="status" class="status stopped" style="margin-bottom:15px">Status: <strong>Stopped</strong></div>
 
   <div class="global-controls" style="background:transparent;padding:0;margin:0">
     <div class="control-row">
-      <button id="pauseBtn" class="btn-warning btn-small">Pause All</button>
-      <button id="continueBtn" class="btn-success btn-small">Continue</button>
-      <button id="startBtn" class="btn-primary btn-small">Start</button>
-      <button id="stopBtn" class="btn-danger btn-small">Stop</button>
+      <button id="startBtn" class="btn-primary">Start Kiosk</button>
+      <button id="stopBtn" class="btn-danger">Stop</button>
     </div>
   </div>
 </div>
@@ -210,7 +121,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
       <div class="form-group">
         <label for="unlockPassword">Unlock Password:</label>
         <input type="text" id="unlockPassword" placeholder="Enter password to unlock restrictions">
-        <div class="help-text">Click 6 times then enter password to unlock</div>
+        <div class="help-text">Click 5 times then enter password to unlock</div>
       </div>
       <div class="form-group">
         <div class="checkbox-group">
@@ -228,7 +139,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
   </div>
 
   <div class="info-box">
-    <strong>Quick Guide:</strong>Add links, configure individual timers, save settings, then start rotation.
+    <strong>Quick Guide:</strong> Add website links, configure settings, save, then start kiosk mode.
   </div>
 </div>
 
@@ -236,10 +147,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="footer-section">
   <div class="buttons" style="margin:0">
     <button id="saveBtn" class="btn-secondary">Save Settings</button>
-  </div>
-  <div class="buttons" style="margin-top:10px">
-    <button id="debugBtn" class="btn-secondary btn-small" style="font-size: 11px;">Debug Storage</button>
-    <button id="clearBtn" class="btn-danger btn-small" style="font-size: 11px;">Clear Storage</button>
   </div>
 </div>
 

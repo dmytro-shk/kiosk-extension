@@ -14,7 +14,8 @@ const state = {
   pauseTime: null,
   linkTimers: [],
   timers: {},
-  lastActivityTime: Date.now()
+  lastActivityTime: Date.now(),
+  globalUnlocked: false
 };
 
 // Load configuration on startup
@@ -89,13 +90,21 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       console.log('[Background] Storage changed:', changes.config);
 
       if (changes.config.newValue) {
+        const oldConfig = state.config;
         Object.assign(state.config, changes.config.newValue);
         console.log('[Background] Updated config:', state.config);
 
         if (state.isRunning) {
-          console.log('[Background] Restarting kiosk mode with new config');
-          stopKioskMode();
-          setTimeout(startKioskMode, 1000);
+          // Instead of restarting everything, just update the timers and broadcast
+          console.log('[Background] Updating running kiosk with new config');
+
+          // Clear any existing timers
+          Object.values(state.timers).forEach(t => t && clearTimeout(t));
+          state.timers = {};
+
+          // Reschedule current link with new configuration
+          scheduleCurrentLink();
+          broadcast();
         }
       }
     }
@@ -135,6 +144,33 @@ chrome.runtime.onMessage.addListener((req, sender, respond) => {
       userActivity: () => {
         state.lastActivityTime = Date.now();
         return {status: 'activity recorded'};
+      },
+      pauseCurrentTab: () => {
+        pauseCurrentTabTimer();
+        return {status: 'current tab paused'};
+      },
+      resumeCurrentTab: () => {
+        resumeCurrentTabTimer();
+        return {status: 'current tab resumed'};
+      },
+      forceNextTab: () => {
+        forceNextTab();
+        return {status: 'forced next tab'};
+      },
+      setGlobalUnlock: (unlocked) => {
+        setGlobalUnlock(unlocked);
+        return {status: 'global unlock set'};
+      },
+      exitKiosk: () => {
+        exitChromeProcess();
+        return {status: 'exiting chrome'};
+      },
+      requestCurrentState: () => {
+        if (state.isRunning) {
+          // Send current state to the requesting tab
+          sendCurrentStateToTab(sender.tab.id);
+        }
+        return {status: 'current state sent'};
       }
     };
 
@@ -213,7 +249,8 @@ function initializeLinkTimers() {
     linkId: link.id,
     total: link.switchInterval,
     remaining: link.switchInterval,
-    startTime: Date.now()
+    startTime: Date.now(),
+    paused: false
   }));
 }
 
@@ -225,6 +262,20 @@ function pauseAllTimers() {
 
   Object.values(state.timers).forEach(t => t && clearTimeout(t));
   state.timers = {};
+
+  // Notify all tabs about the pause state
+  state.tabs.forEach(async (tab) => {
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'updatePauseState',
+        isPaused: true
+      });
+    } catch (e) {
+      // Tab might not be ready
+    }
+  });
+
+  console.log('All timers paused globally');
 }
 
 function resumeAllTimers() {
@@ -236,10 +287,55 @@ function resumeAllTimers() {
 
   state.linkTimers.forEach(timer => {
     timer.startTime = Date.now();
+    timer.paused = false;
+  });
+
+  // Notify all tabs about the resume state
+  state.tabs.forEach(async (tab) => {
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'updatePauseState',
+        isPaused: false
+      });
+    } catch (e) {
+      // Tab might not be ready
+    }
   });
 
   scheduleCurrentLink();
   broadcast();
+
+  console.log('All timers resumed globally');
+}
+
+function pauseCurrentTabTimer() {
+  if (!state.isRunning || state.isPaused) return;
+
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+  if (currentTimer && !currentTimer.paused) {
+    currentTimer.paused = true;
+
+    // Clear the current timers since we're pausing this tab
+    Object.values(state.timers).forEach(t => t && clearTimeout(t));
+    state.timers = {};
+
+    console.log(`Paused timer for tab ${state.currentTabIndex + 1}`);
+  }
+}
+
+function resumeCurrentTabTimer() {
+  if (!state.isRunning || state.isPaused) return;
+
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+  if (currentTimer && currentTimer.paused) {
+    currentTimer.paused = false;
+    currentTimer.startTime = Date.now();
+
+    // Restart the timer for this tab
+    scheduleCurrentLink();
+
+    console.log(`Resumed timer for tab ${state.currentTabIndex + 1}`);
+  }
 }
 
 
@@ -249,21 +345,38 @@ function scheduleCurrentLink() {
   const currentLink = state.config.links[state.currentTabIndex];
   const currentTimer = state.linkTimers[state.currentTabIndex];
 
-  if (!currentLink || !currentTimer) return;
+  if (!currentLink || !currentTimer || currentTimer.paused) return;
 
   Object.values(state.timers).forEach(t => t && clearTimeout(t));
   state.timers = {};
 
   // Always use the full switchInterval from the link configuration, not the remaining time
   const switchTime = currentLink.switchInterval * 1000;
-  const refreshTime = currentLink.refreshEnabled ?
-    Math.max(0, switchTime - (currentLink.refreshBeforeSwitch * 1000)) : -1;
 
-  if (refreshTime > 0 && refreshTime < switchTime) {
+  // Get the NEXT tab's refresh settings since we're refreshing the next tab before switching to it
+  const nextIndex = (state.currentTabIndex + 1) % state.tabs.length;
+  const nextLink = state.config.links[nextIndex];
+
+  // Safety check: ensure we have the corresponding link config
+  if (!nextLink) {
+    console.warn(`No link config found for next index ${nextIndex}, skipping refresh scheduling`);
+  }
+
+  const refreshTime = nextLink?.refreshEnabled ?
+    Math.max(0, switchTime - (nextLink.refreshBeforeSwitch * 1000)) : -1;
+
+  console.log(`Scheduling for tab ${state.currentTabIndex + 1}: nextTab=${nextIndex + 1}, nextTabRefreshEnabled=${nextLink?.refreshEnabled}, refreshTime=${refreshTime}, switchTime=${switchTime}`);
+
+  if (nextLink?.refreshEnabled && refreshTime > 0 && refreshTime < switchTime) {
     state.timers.refresh = setTimeout(() => refresh(), refreshTime);
+    console.log(`Refresh scheduled in ${refreshTime}ms for next tab ${nextIndex + 1}`);
+  } else {
+    console.log(`Refresh NOT scheduled for next tab ${nextIndex + 1} - refreshEnabled: ${nextLink?.refreshEnabled}`);
   }
 
   state.timers.switch = setTimeout(() => switchTab(), switchTime);
+  console.log(`Switch timer scheduled in ${switchTime}ms for tab ${state.currentTabIndex + 1}`);
+
   currentTimer.startTime = Date.now();
   currentTimer.remaining = currentLink.switchInterval; // Reset remaining to full interval
 }
@@ -272,6 +385,22 @@ async function refresh() {
   if (!state.isRunning || state.isPaused || !state.tabs.length) return;
 
   const nextIndex = (state.currentTabIndex + 1) % state.tabs.length;
+  const nextLink = state.config.links[nextIndex];
+
+  console.log(`Refresh function called - refreshing next tab ${nextIndex + 1}, refreshEnabled: ${nextLink?.refreshEnabled}`);
+
+  // Safety check: ensure we have the corresponding link config
+  if (!nextLink) {
+    console.warn(`No link config found for next index ${nextIndex}, skipping refresh`);
+    return;
+  }
+
+  // Double-check if refresh is still enabled for the NEXT tab (the one we're refreshing)
+  if (!nextLink.refreshEnabled) {
+    console.log('Refresh called but next tab refreshEnabled is false, skipping refresh');
+    return;
+  }
+
   try {
     // Verify tab exists before refreshing
     const tabExists = await validateTab(state.tabs[nextIndex].id);
@@ -281,7 +410,7 @@ async function refresh() {
     }
 
     await chrome.tabs.reload(state.tabs[nextIndex].id);
-    console.log(`Refreshed tab ${nextIndex + 1}`);
+    console.log(`Refreshed next tab ${nextIndex + 1}`);
   } catch (e) {
     console.error('Refresh failed:', e);
   }
@@ -362,6 +491,16 @@ async function recreateTabs() {
 async function switchTab() {
   if (!state.isRunning || state.isPaused || !state.tabs.length) return;
 
+  // Notify old tab it's becoming inactive
+  const oldTabId = state.tabs[state.currentTabIndex]?.id;
+  if (oldTabId) {
+    try {
+      await chrome.tabs.sendMessage(oldTabId, {action: 'tabBecameInactive'});
+    } catch (e) {
+      // Tab might be closed or not ready
+    }
+  }
+
   const currentTimer = state.linkTimers[state.currentTabIndex];
   if (currentTimer) {
     currentTimer.remaining = currentTimer.total;
@@ -381,6 +520,13 @@ async function switchTab() {
 
     await chrome.tabs.update(state.tabs[state.currentTabIndex].id, {active: true});
     console.log(`Switched to tab ${state.currentTabIndex + 1}`);
+
+    // Notify new tab it became active
+    try {
+      await chrome.tabs.sendMessage(state.tabs[state.currentTabIndex].id, {action: 'tabBecameActive'});
+    } catch (e) {
+      // Tab might not be ready for messages yet
+    }
 
     broadcast();
     scheduleCurrentLink();
@@ -402,18 +548,36 @@ async function broadcast() {
   const currentLink = state.config.links[state.currentTabIndex];
   if (!currentLink) return;
 
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+
   const msg = {
     action: 'updateClickBlock',
     startTime: state.startTime,
     blockAfter: currentLink.blockClicksAfter * 1000,
     hoverOnlyMode: state.config.hoverOnlyMode,
-    unlockPassword: state.config.unlockPassword
+    unlockPassword: state.config.unlockPassword,
+    currentTabTimer: currentTimer,
+    unlocked: state.globalUnlocked
   };
 
   // Send message to each tab, ignoring failures for closed tabs
-  for (const tab of state.tabs) {
+  for (let i = 0; i < state.tabs.length; i++) {
+    const tab = state.tabs[i];
     try {
-      await chrome.tabs.sendMessage(tab.id, msg);
+      // Send timer info only to the active tab
+      if (i === state.currentTabIndex) {
+        await chrome.tabs.sendMessage(tab.id, msg);
+      } else {
+        // Send basic update to inactive tabs
+        await chrome.tabs.sendMessage(tab.id, {
+          action: 'updateClickBlock',
+          startTime: state.startTime,
+          blockAfter: currentLink.blockClicksAfter * 1000,
+          hoverOnlyMode: state.config.hoverOnlyMode,
+          unlockPassword: state.config.unlockPassword,
+          unlocked: state.globalUnlocked
+        });
+      }
     } catch (e) {
       // Tab might be closed or not ready for messages
       console.log(`Failed to send message to tab ${tab.id}:`, e.message);
@@ -426,11 +590,22 @@ setInterval(() => {
   if (!state.isRunning || state.isPaused) return;
 
   state.linkTimers.forEach((timer, index) => {
-    if (timer.startTime) {
+    if (timer.startTime && !timer.paused) {
       const elapsed = Math.floor((Date.now() - timer.startTime) / 1000);
       timer.remaining = Math.max(0, timer.total - elapsed);
     }
   });
+
+  // Update the active tab's timer display
+  if (state.tabs[state.currentTabIndex]) {
+    const currentTimer = state.linkTimers[state.currentTabIndex];
+    chrome.tabs.sendMessage(state.tabs[state.currentTabIndex].id, {
+      action: 'updateTimer',
+      currentTabTimer: currentTimer
+    }).catch(() => {
+      // Tab might not be ready for messages
+    });
+  }
 }, 1000);
 
 // Auto-resume functionality
@@ -463,6 +638,88 @@ async function validateAllTabsExist() {
     if (!exists) return false;
   }
   return true;
+}
+
+// Force next tab function
+async function forceNextTab() {
+  if (!state.isRunning || !state.tabs.length) return;
+
+  // Reset the current tab timer
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+  if (currentTimer) {
+    currentTimer.remaining = currentTimer.total;
+  }
+
+  // Manually switch to next tab
+  await switchTab();
+}
+
+// Exit Chrome process function
+async function exitChromeProcess() {
+  try {
+    console.log('Exiting Chrome process...');
+
+    // Stop kiosk mode first
+    if (state.isRunning) {
+      stopKioskMode();
+    }
+
+    // Close all Chrome windows
+    const windows = await chrome.windows.getAll();
+    for (const window of windows) {
+      try {
+        await chrome.windows.remove(window.id);
+      } catch (e) {
+        console.log(`Failed to close window ${window.id}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to exit Chrome:', e);
+  }
+}
+
+// Send current state to a specific tab
+async function sendCurrentStateToTab(tabId) {
+  if (!state.isRunning || !state.startTime) return;
+
+  const currentLink = state.config.links[state.currentTabIndex];
+  if (!currentLink) return;
+
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+
+  const msg = {
+    action: 'updateClickBlock',
+    startTime: state.startTime,
+    blockAfter: currentLink.blockClicksAfter * 1000,
+    hoverOnlyMode: state.config.hoverOnlyMode,
+    unlockPassword: state.config.unlockPassword,
+    currentTabTimer: currentTimer,
+    unlocked: state.globalUnlocked
+  };
+
+  try {
+    await chrome.tabs.sendMessage(tabId, msg);
+    console.log(`Sent current state to tab ${tabId}`);
+  } catch (e) {
+    console.log(`Failed to send current state to tab ${tabId}:`, e.message);
+  }
+}
+
+// Global unlock state management
+function setGlobalUnlock(unlocked) {
+  state.globalUnlocked = unlocked;
+
+  // Notify all tabs about the new unlock state
+  state.tabs.forEach(async (tab) => {
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'updateUnlockState',
+        unlocked: unlocked
+      });
+    } catch (e) {
+      // Tab might not be ready
+    }
+  });
 }
 
 // Keep alive
