@@ -123,14 +123,6 @@ chrome.runtime.onMessage.addListener((req, sender, respond) => {
         resumeAllTimers();
         return {status: 'resumed'};
       },
-      pauseLink: (linkId) => {
-        pauseLinkTimer(linkId);
-        return {status: 'link paused'};
-      },
-      continueLink: (linkId) => {
-        resumeLinkTimer(linkId);
-        return {status: 'link resumed'};
-      },
       getStatus: () => ({
         isRunning: state.isRunning,
         isPaused: state.isPaused,
@@ -221,7 +213,6 @@ function initializeLinkTimers() {
     linkId: link.id,
     total: link.switchInterval,
     remaining: link.switchInterval,
-    paused: false,
     startTime: Date.now()
   }));
 }
@@ -234,12 +225,6 @@ function pauseAllTimers() {
 
   Object.values(state.timers).forEach(t => t && clearTimeout(t));
   state.timers = {};
-
-  state.linkTimers.forEach(timer => {
-    if (!timer.paused) {
-      timer.paused = true;
-    }
-  });
 }
 
 function resumeAllTimers() {
@@ -250,7 +235,6 @@ function resumeAllTimers() {
   state.startTime += pauseDuration;
 
   state.linkTimers.forEach(timer => {
-    timer.paused = false;
     timer.startTime = Date.now();
   });
 
@@ -258,29 +242,6 @@ function resumeAllTimers() {
   broadcast();
 }
 
-function pauseLinkTimer(linkId) {
-  const timer = state.linkTimers.find(t => t.linkId === linkId);
-  if (timer && !timer.paused) {
-    timer.paused = true;
-
-    if (state.config.links[state.currentTabIndex]?.id === linkId) {
-      Object.values(state.timers).forEach(t => t && clearTimeout(t));
-      state.timers = {};
-    }
-  }
-}
-
-function resumeLinkTimer(linkId) {
-  const timer = state.linkTimers.find(t => t.linkId === linkId);
-  if (timer && timer.paused) {
-    timer.paused = false;
-    timer.startTime = Date.now();
-
-    if (state.config.links[state.currentTabIndex]?.id === linkId) {
-      scheduleCurrentLink();
-    }
-  }
-}
 
 function scheduleCurrentLink() {
   if (!state.isRunning || state.isPaused) return;
@@ -288,21 +249,23 @@ function scheduleCurrentLink() {
   const currentLink = state.config.links[state.currentTabIndex];
   const currentTimer = state.linkTimers[state.currentTabIndex];
 
-  if (!currentLink || !currentTimer || currentTimer.paused) return;
+  if (!currentLink || !currentTimer) return;
 
   Object.values(state.timers).forEach(t => t && clearTimeout(t));
   state.timers = {};
 
-  const remainingTime = currentTimer.remaining * 1000;
+  // Always use the full switchInterval from the link configuration, not the remaining time
+  const switchTime = currentLink.switchInterval * 1000;
   const refreshTime = currentLink.refreshEnabled ?
-    Math.max(0, remainingTime - (currentLink.refreshBeforeSwitch * 1000)) : -1;
+    Math.max(0, switchTime - (currentLink.refreshBeforeSwitch * 1000)) : -1;
 
-  if (refreshTime > 0 && refreshTime < remainingTime) {
+  if (refreshTime > 0 && refreshTime < switchTime) {
     state.timers.refresh = setTimeout(() => refresh(), refreshTime);
   }
 
-  state.timers.switch = setTimeout(() => switchTab(), remainingTime);
+  state.timers.switch = setTimeout(() => switchTab(), switchTime);
   currentTimer.startTime = Date.now();
+  currentTimer.remaining = currentLink.switchInterval; // Reset remaining to full interval
 }
 
 async function refresh() {
@@ -463,7 +426,7 @@ setInterval(() => {
   if (!state.isRunning || state.isPaused) return;
 
   state.linkTimers.forEach((timer, index) => {
-    if (!timer.paused && timer.startTime) {
+    if (timer.startTime) {
       const elapsed = Math.floor((Date.now() - timer.startTime) / 1000);
       timer.remaining = Math.max(0, timer.total - elapsed);
     }

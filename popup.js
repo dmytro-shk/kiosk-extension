@@ -283,10 +283,6 @@ function createLinkElement(link, index) {
       <div class="progress-bar">
         <div class="progress-fill" id="progress-${link.id}" style="width: 0%"></div>
       </div>
-      <div class="timer-controls">
-        <button class="btn-warning btn-small link-pause" data-link-id="${link.id}">Pause</button>
-        <button class="btn-success btn-small link-continue" data-link-id="${link.id}">Continue</button>
-      </div>
     </div>
   `;
 
@@ -328,17 +324,6 @@ function setupLinkEventListeners(element, linkId) {
       updateLinkField(linkId, field, value);
     });
   });
-
-  // Pause/Continue buttons
-  const pauseBtn = element.querySelector('.link-pause');
-  if (pauseBtn) {
-    pauseBtn.addEventListener('click', () => pauseLink(linkId));
-  }
-
-  const continueBtn = element.querySelector('.link-continue');
-  if (continueBtn) {
-    continueBtn.addEventListener('click', () => continueLink(linkId));
-  }
 }
 
 function updateLinkField(linkId, field, value) {
@@ -372,13 +357,6 @@ function updateLinkField(linkId, field, value) {
   }
 }
 
-function pauseLink(linkId) {
-  msg('pauseLink', linkId);
-}
-
-function continueLink(linkId) {
-  msg('continueLink', linkId);
-}
 
 function save() {
   // Validate all links
@@ -524,7 +502,7 @@ function updateLinkTimers(status) {
     el.floatingTimerProgress.style.width = `${Math.max(0, Math.min(100, progress))}%`;
 
     // Update paused state
-    if (currentTimer.paused || status.isPaused) {
+    if (status.isPaused) {
       el.floatingTimer.classList.add('paused');
     } else {
       el.floatingTimer.classList.remove('paused');
@@ -546,7 +524,7 @@ function updateLinkTimers(status) {
     }
 
     // Update timer display
-    if (timer.paused) {
+    if (status.isPaused) {
       timerEl.textContent = `Paused (${timer.remaining}s)`;
       timerEl.classList.add('paused');
       progressEl.classList.add('paused');
