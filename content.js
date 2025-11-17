@@ -75,9 +75,13 @@ chrome.runtime.onMessage.addListener((req) => {
       console.log('Updating unlocked state from background:', req.unlocked);
       unlocked = req.unlocked;
     }
+    // Update pause state from background
+    if (req.hasOwnProperty('isPaused')) {
+      console.log('Updating pause state from background:', req.isPaused);
+      isPaused = req.isPaused;
+    }
     clickCount = 0;
     unlockClickCount = 0;
-    isPaused = false;
     currentTabTimer = req.currentTabTimer;
     schedule();
     // Only create menu button if it doesn't exist
@@ -500,12 +504,13 @@ function updateMenuButton() {
   }
 
   // Update button color based on state
+  // Priority: Paused state takes precedence over locked/unlocked state
   const isLocked = !unlocked;
   const bgColor = isPaused
-    ? 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)'
+    ? 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)'  // Yellow/Orange when paused
     : isLocked
-      ? 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'
-      : 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+      ? 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'  // Red when locked
+      : 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'  // Green when unlocked
 
   menuButton.style.background = bgColor;
 }

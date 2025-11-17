@@ -557,7 +557,8 @@ async function broadcast() {
     hoverOnlyMode: state.config.hoverOnlyMode,
     unlockPassword: state.config.unlockPassword,
     currentTabTimer: currentTimer,
-    unlocked: state.globalUnlocked
+    unlocked: state.globalUnlocked,
+    isPaused: state.isPaused
   };
 
   // Send message to each tab, ignoring failures for closed tabs
@@ -575,7 +576,8 @@ async function broadcast() {
           blockAfter: currentLink.blockClicksAfter * 1000,
           hoverOnlyMode: state.config.hoverOnlyMode,
           unlockPassword: state.config.unlockPassword,
-          unlocked: state.globalUnlocked
+          unlocked: state.globalUnlocked,
+          isPaused: state.isPaused
         });
       }
     } catch (e) {
@@ -694,7 +696,8 @@ async function sendCurrentStateToTab(tabId) {
     hoverOnlyMode: state.config.hoverOnlyMode,
     unlockPassword: state.config.unlockPassword,
     currentTabTimer: currentTimer,
-    unlocked: state.globalUnlocked
+    unlocked: state.globalUnlocked,
+    isPaused: state.isPaused
   };
 
   try {
