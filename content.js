@@ -1,15 +1,11 @@
 (function() {
-  // Only run in the main frame, not in iframes
-  if (window.self !== window.top) {
-    // This is an iframe, don't initialize
-    return;
-  }
+  // Run in all frames including iframes to ensure complete blocking
+  const isMainFrame = window.self === window.top;
 
   let blocked = false;
 let start = null;
 let after = 120000;
 let timer = null;
-let hoverOnlyMode = false;
 let unlockPassword = '';
 let clickCount = 0;
 let unlocked = false;
@@ -68,7 +64,6 @@ chrome.runtime.onMessage.addListener((req) => {
   if (req.action === 'updateClickBlock') {
     start = req.startTime;
     after = req.blockAfter;
-    hoverOnlyMode = req.hoverOnlyMode || false;
     unlockPassword = req.unlockPassword || '';
     // Only update unlocked state from background if it's explicitly provided and different
     if (req.hasOwnProperty('unlocked') && req.unlocked !== unlocked) {
@@ -100,6 +95,13 @@ chrome.runtime.onMessage.addListener((req) => {
   } else if (req.action === 'updateUnlockState') {
     unlocked = req.unlocked;
     updateButtonVisibility();
+    updateBlockingOverlay();
+
+    // Recreate menu container to update Exit button if menu is visible
+    if (menuVisible && menuContainer) {
+      hideMenu();
+      showMenu();
+    }
   } else if (req.action === 'updatePauseState') {
     isPaused = req.isPaused;
     updateButtonVisibility();
@@ -141,7 +143,10 @@ function schedule() {
       blocked = true;
       console.log('Click blocking activated');
       showBlockNotification();
+      updateBlockingOverlay();
     }, after - elapsed);
+  } else {
+    updateBlockingOverlay();
   }
 }
 
@@ -182,9 +187,90 @@ function showBlockNotification() {
   }, 3000);
 }
 
+// CSS-based blocking overlay for aggressive blocking
+let blockingOverlay = null;
+
+function createBlockingOverlay() {
+  if (blockingOverlay) return;
+
+  blockingOverlay = document.createElement('div');
+  blockingOverlay.id = 'kiosk-blocking-overlay';
+  blockingOverlay.style.cssText = `
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2147483646 !important;
+    background: transparent !important;
+    pointer-events: auto !important;
+    cursor: not-allowed !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+  `;
+
+  // Add click handler to overlay for unlock sequence
+  blockingOverlay.addEventListener('click', function(e) {
+    if (!unlocked) {
+      unlockClickCount++;
+
+      if (unlockClickCount === 5) {
+        unlockInProgress = true;
+        attemptUnlock();
+      }
+
+      if (unlockClickCount > 5) unlockClickCount = 1;
+
+      // Visual feedback
+      showClickBlockedFeedback(e.clientX, e.clientY);
+
+      // Show progress
+      if (unlockClickCount >= 1 && unlockClickCount < 5) {
+        showNotification(`Click ${5 - unlockClickCount} more times to unlock`, 'rgba(255, 193, 7, 0.9)', '#000');
+      }
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    return false;
+  }, true);
+
+  // Also block context menu on overlay
+  blockingOverlay.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    return false;
+  }, true);
+
+  document.body.appendChild(blockingOverlay);
+}
+
+function removeBlockingOverlay() {
+  if (blockingOverlay && blockingOverlay.parentNode) {
+    blockingOverlay.parentNode.removeChild(blockingOverlay);
+    blockingOverlay = null;
+  }
+}
+
+function updateBlockingOverlay() {
+  const shouldHaveOverlay = blocked && !unlocked && !isPaused;
+
+  if (shouldHaveOverlay) {
+    createBlockingOverlay();
+  } else {
+    removeBlockingOverlay();
+  }
+}
+
 const block = (e) => {
-  // Always allow clicks on control buttons
-  if (e.target) {
+  // Always allow clicks on control buttons (only in main frame)
+  if (isMainFrame && e.target) {
     // Direct ID check
     if (e.target.id === 'kiosk-menu-button' ||
         e.target.id === 'kiosk-menu-container' ||
@@ -218,11 +304,11 @@ const block = (e) => {
     return false;
   }
 
-  const shouldBlock = blocked || (hoverOnlyMode && !isHoverEvent(e.type));
+  const shouldBlock = blocked;
 
   if (shouldBlock) {
-    // Handle unlock sequence
-    if (e.type === 'click') {
+    // Handle unlock sequence only in main frame
+    if (isMainFrame && e.type === 'click') {
       unlockClickCount++;
       trackUserActivity();
 
@@ -256,9 +342,6 @@ const block = (e) => {
   }
 };
 
-function isHoverEvent(eventType) {
-  return ['mouseover', 'mouseenter', 'mouseleave', 'mousemove'].includes(eventType);
-}
 
 function showClickBlockedFeedback(x, y) {
   const feedback = document.createElement('div');
@@ -320,6 +403,9 @@ function showIncorrectPasswordNotification() {
 
 
 function createControlButtons() {
+  // Only create control buttons in the main frame
+  if (!isMainFrame) return;
+
   console.log('createControlButtons called, start:', start, 'kiosk running checks');
 
   // Check if menu button already exists
@@ -562,6 +648,7 @@ function togglePause() {
   }
 
   updateButtonVisibility();
+  updateBlockingOverlay();
 }
 
 function switchToNextTab() {
@@ -611,6 +698,14 @@ function performUnlock() {
 
   showUnlockNotification();
   updateButtonVisibility();
+  updateBlockingOverlay();
+
+  // Recreate menu container to show Exit button immediately if menu is visible
+  if (menuVisible && menuContainer) {
+    hideMenu();
+    showMenu();
+  }
+
   startInactivityTimer();
 }
 
@@ -624,6 +719,14 @@ function performLock() {
 
   showLockNotification();
   updateButtonVisibility();
+  updateBlockingOverlay();
+
+  // Recreate menu container to hide Exit button immediately if menu is visible
+  if (menuVisible && menuContainer) {
+    hideMenu();
+    showMenu();
+  }
+
   stopInactivityTimer();
 }
 
@@ -762,7 +865,7 @@ const interactive = (el) => {
 const blockKey = (e) => {
   if (unlocked || isPaused) return;
 
-  const shouldBlock = (blocked || hoverOnlyMode) &&
+  const shouldBlock = blocked &&
                      (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32);
 
   if (shouldBlock && interactive(e.target)) {
@@ -780,17 +883,78 @@ const blockKey = (e) => {
 // Enhanced event blocking
 const blockEvents = [
   'click', 'dblclick', 'mousedown', 'mouseup', 'auxclick',
-  'contextmenu', 'submit', 'dragstart', 'selectstart'
+  'contextmenu', 'submit', 'dragstart', 'selectstart', 'pointerdown',
+  'pointerup', 'touchstart', 'touchend'
 ];
 
 const keyEvents = ['keydown', 'keyup', 'keypress'];
 
+// Function to attach blocking to an element
+function attachBlockingToElement(element) {
+  blockEvents.forEach(ev => {
+    element.addEventListener(ev, block, true);
+  });
+
+  keyEvents.forEach(ev => {
+    element.addEventListener(ev, blockKey, true);
+  });
+}
+
+// Attach to document
+attachBlockingToElement(document);
+
+// Also attach to window for extra coverage
 blockEvents.forEach(ev => {
-  document.addEventListener(ev, block, true);
+  window.addEventListener(ev, block, true);
 });
 
 keyEvents.forEach(ev => {
-  document.addEventListener(ev, blockKey, true);
+  window.addEventListener(ev, blockKey, true);
+});
+
+// Monitor for new Shadow DOMs and attach blocking
+const originalAttachShadow = Element.prototype.attachShadow;
+Element.prototype.attachShadow = function(...args) {
+  const shadowRoot = originalAttachShadow.apply(this, args);
+
+  // Attach blocking to the shadow root
+  attachBlockingToElement(shadowRoot);
+
+  return shadowRoot;
+};
+
+// Monitor for dynamically added elements and reapply blocking
+const observer = new MutationObserver((mutations) => {
+  // Check if we need to recreate the overlay (in case it was removed)
+  if (blocked && !unlocked && !isPaused) {
+    if (!document.getElementById('kiosk-blocking-overlay')) {
+      createBlockingOverlay();
+    }
+  }
+
+  // Look for shadow roots in new elements
+  mutations.forEach(mutation => {
+    mutation.addedNodes.forEach(node => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.shadowRoot) {
+          attachBlockingToElement(node.shadowRoot);
+        }
+        // Check descendants for shadow roots
+        const elementsWithShadow = node.querySelectorAll('*');
+        elementsWithShadow.forEach(el => {
+          if (el.shadowRoot) {
+            attachBlockingToElement(el.shadowRoot);
+          }
+        });
+      }
+    });
+  });
+});
+
+// Start observing
+observer.observe(document.body, {
+  childList: true,
+  subtree: true
 });
 
 // Track user activity

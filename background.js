@@ -3,7 +3,6 @@ const state = {
     links: [],
     kioskMode: false,
     autoStart: false,
-    hoverOnlyMode: false,
     unlockPassword: ''
   },
   isRunning: false,
@@ -57,7 +56,6 @@ function loadConfig() {
             links,
             kioskMode: config.kioskMode || false,
             autoStart: config.autoStart || false,
-            hoverOnlyMode: config.hoverOnlyMode || false,
             unlockPassword: config.unlockPassword || ''
           };
 
@@ -554,7 +552,6 @@ async function broadcast() {
     action: 'updateClickBlock',
     startTime: state.startTime,
     blockAfter: currentLink.blockClicksAfter * 1000,
-    hoverOnlyMode: state.config.hoverOnlyMode,
     unlockPassword: state.config.unlockPassword,
     currentTabTimer: currentTimer,
     unlocked: state.globalUnlocked,
@@ -574,8 +571,7 @@ async function broadcast() {
           action: 'updateClickBlock',
           startTime: state.startTime,
           blockAfter: currentLink.blockClicksAfter * 1000,
-          hoverOnlyMode: state.config.hoverOnlyMode,
-          unlockPassword: state.config.unlockPassword,
+                unlockPassword: state.config.unlockPassword,
           unlocked: state.globalUnlocked,
           isPaused: state.isPaused
         });
@@ -693,7 +689,6 @@ async function sendCurrentStateToTab(tabId) {
     action: 'updateClickBlock',
     startTime: state.startTime,
     blockAfter: currentLink.blockClicksAfter * 1000,
-    hoverOnlyMode: state.config.hoverOnlyMode,
     unlockPassword: state.config.unlockPassword,
     currentTabTimer: currentTimer,
     unlocked: state.globalUnlocked,

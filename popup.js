@@ -3,7 +3,6 @@ const state = {
   config: {
     kioskMode: false,
     autoStart: false,
-    hoverOnlyMode: false,
     unlockPassword: ''
   },
   timers: {},
@@ -16,7 +15,7 @@ const el = {};
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize elements
   ['saveBtn', 'startBtn', 'stopBtn', 'status', 'addLinkBtn', 'linksContainer',
-   'kioskMode', 'autoStart', 'hoverOnlyMode', 'unlockPassword'].forEach(id => {
+   'kioskMode', 'autoStart', 'unlockPassword'].forEach(id => {
     el[id] = document.getElementById(id);
   });
 
@@ -105,7 +104,6 @@ function load() {
     state.config = {
       kioskMode: config.kioskMode || false,
       autoStart: config.autoStart || false,
-      hoverOnlyMode: config.hoverOnlyMode || false,
       unlockPassword: config.unlockPassword || ''
     };
 
@@ -129,7 +127,6 @@ function createDefaultLink(url) {
 function loadGlobalSettings() {
   el.kioskMode.checked = state.config.kioskMode;
   el.autoStart.checked = state.config.autoStart;
-  el.hoverOnlyMode.checked = state.config.hoverOnlyMode;
   el.unlockPassword.value = state.config.unlockPassword;
 }
 
@@ -310,7 +307,6 @@ function save() {
   // Save global settings
   state.config.kioskMode = el.kioskMode.checked;
   state.config.autoStart = el.autoStart.checked;
-  state.config.hoverOnlyMode = el.hoverOnlyMode.checked;
   state.config.unlockPassword = el.unlockPassword.value.trim();
 
   const configToSave = {
