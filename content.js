@@ -420,8 +420,8 @@ function createMenuContainer() {
   const buttons = [
     { id: 'pause', text: isPaused ? '▶️ Resume' : '⏸️ Pause', action: togglePause },
     { id: 'next', text: '⏭️ Next', action: switchToNextTab },
+    { id: 'lock', text: unlocked ? '🔒 Lock' : '🔓 Unlock', action: unlocked ? performLock : attemptUnlock },
     ...(unlocked ? [
-      { id: 'lock', text: '🔒 Lock', action: performLock },
       { id: 'exit', text: '❌ Exit', action: exitKiosk }
     ] : [])
   ];
