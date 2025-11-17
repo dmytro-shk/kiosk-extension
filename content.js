@@ -21,6 +21,7 @@ let lastUserActivity = Date.now();
 let inactivityTimer = null;
 let unlockInProgress = false;
 let hoverModeEnabled = false;
+let allowClicksForThisLink = false;
 
 // Initialize content script - check if kiosk mode is running
 function initializeContentScript() {
@@ -80,6 +81,11 @@ chrome.runtime.onMessage.addListener((req) => {
     if (req.hasOwnProperty('hoverModeEnabled')) {
       console.log('Updating hover mode from background:', req.hoverModeEnabled);
       hoverModeEnabled = req.hoverModeEnabled;
+    }
+    // Update allow clicks state from background
+    if (req.hasOwnProperty('allowClicks')) {
+      console.log('Updating allow clicks from background:', req.allowClicks);
+      allowClicksForThisLink = req.allowClicks;
     }
     clickCount = 0;
     unlockClickCount = 0;
@@ -273,8 +279,8 @@ function removeBlockingOverlay() {
 }
 
 function updateBlockingOverlay() {
-  // Don't show overlay if hover mode is enabled - this allows hover but still blocks clicks
-  const shouldHaveOverlay = blocked && !unlocked && !isPaused && !hoverModeEnabled;
+  // Don't show overlay if hover mode is enabled, clicks are allowed for this link, or other conditions
+  const shouldHaveOverlay = blocked && !unlocked && !isPaused && !hoverModeEnabled && !allowClicksForThisLink;
 
   if (shouldHaveOverlay) {
     createBlockingOverlay();
@@ -303,9 +309,9 @@ const block = (e) => {
     }
   }
 
-  // Don't block if unlocked
-  if (unlocked) {
-    console.log('User is unlocked - allowing interaction');
+  // Don't block if unlocked or clicks are allowed for this link
+  if (unlocked || allowClicksForThisLink) {
+    console.log('Interaction allowed - unlocked:', unlocked, 'allowClicks:', allowClicksForThisLink);
     trackUserActivity();
     return;
   }
@@ -920,7 +926,7 @@ const interactive = (el) => {
 };
 
 const blockKey = (e) => {
-  if (unlocked || isPaused) return;
+  if (unlocked || isPaused || allowClicksForThisLink) return;
 
   const shouldBlock = blocked &&
                      (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32);
@@ -983,7 +989,7 @@ Element.prototype.attachShadow = function(...args) {
 // Monitor for dynamically added elements and reapply blocking
 const observer = new MutationObserver((mutations) => {
   // Check if we need to recreate the overlay (in case it was removed)
-  if (blocked && !unlocked && !isPaused) {
+  if (blocked && !unlocked && !isPaused && !allowClicksForThisLink) {
     if (!document.getElementById('kiosk-blocking-overlay')) {
       createBlockingOverlay();
     }

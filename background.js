@@ -561,7 +561,8 @@ async function broadcast() {
     currentTabTimer: currentTimer,
     unlocked: state.globalUnlocked,
     isPaused: state.isPaused,
-    hoverModeEnabled: state.hoverModeEnabled
+    hoverModeEnabled: state.hoverModeEnabled,
+    allowClicks: currentLink.allowClicks || false
   };
 
   // Send message to each tab, ignoring failures for closed tabs
@@ -573,14 +574,16 @@ async function broadcast() {
         await chrome.tabs.sendMessage(tab.id, msg);
       } else {
         // Send basic update to inactive tabs
+        const inactiveTabLink = state.config.links[i];
         await chrome.tabs.sendMessage(tab.id, {
           action: 'updateClickBlock',
           startTime: state.startTime,
-          blockAfter: currentLink.blockClicksAfter * 1000,
+          blockAfter: inactiveTabLink ? inactiveTabLink.blockClicksAfter * 1000 : currentLink.blockClicksAfter * 1000,
                 unlockPassword: state.config.unlockPassword,
           unlocked: state.globalUnlocked,
           isPaused: state.isPaused,
-          hoverModeEnabled: state.hoverModeEnabled
+          hoverModeEnabled: state.hoverModeEnabled,
+          allowClicks: inactiveTabLink ? (inactiveTabLink.allowClicks || false) : false
         });
       }
     } catch (e) {
@@ -700,7 +703,8 @@ async function sendCurrentStateToTab(tabId) {
     currentTabTimer: currentTimer,
     unlocked: state.globalUnlocked,
     isPaused: state.isPaused,
-    hoverModeEnabled: state.hoverModeEnabled
+    hoverModeEnabled: state.hoverModeEnabled,
+    allowClicks: currentLink.allowClicks || false
   };
 
   try {

@@ -204,7 +204,8 @@ function createDefaultLink(url) {
     switchInterval: 30,
     refreshBeforeSwitch: 5,
     refreshEnabled: true,
-    blockClicksAfter: 120
+    blockClicksAfter: 120,
+    allowClicks: false
   };
 }
 
@@ -293,6 +294,14 @@ function createLinkElement(link, index) {
         <label>Block Clicks After (sec):</label>
         <input type="number" class="link-number-input" value="${link.blockClicksAfter}" min="0" max="3600"
                data-link-id="${link.id}" data-field="blockClicksAfter">
+      </div>
+      <div>
+        <label style="color: #4CAF50; font-weight: 600;">
+          <input type="checkbox" class="link-checkbox-input" ${link.allowClicks ? 'checked' : ''}
+                 data-link-id="${link.id}" data-field="allowClicks">
+          ✓ Allow Clicks
+        </label>
+        <div class="help-text" style="margin-left: 20px; margin-top: 2px;">Override blocking for this link</div>
       </div>
     </div>
 
