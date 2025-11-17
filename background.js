@@ -263,8 +263,22 @@ function pauseAllTimers() {
   state.isPaused = true;
   state.pauseTime = Date.now();
 
+  // Store the remaining time for the current tab before pausing
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+  if (currentTimer && currentTimer.startTime) {
+    const elapsed = Math.floor((Date.now() - currentTimer.startTime) / 1000);
+    currentTimer.remaining = Math.max(0, currentTimer.total - elapsed);
+    currentTimer.pausedAt = currentTimer.remaining; // Store where we paused
+  }
+
+  // Clear all timers including switch and refresh timers
   Object.values(state.timers).forEach(t => t && clearTimeout(t));
   state.timers = {};
+
+  // Mark all link timers as paused
+  state.linkTimers.forEach(timer => {
+    timer.paused = true;
+  });
 
   // Notify all tabs about the pause state
   state.tabs.forEach(async (tab) => {
@@ -285,12 +299,50 @@ function resumeAllTimers() {
   if (!state.isRunning || !state.isPaused) return;
 
   state.isPaused = false;
-  const pauseDuration = Date.now() - state.pauseTime;
-  state.startTime += pauseDuration;
 
+  // Get the current timer to resume from where it was paused
+  const currentTimer = state.linkTimers[state.currentTabIndex];
+  if (currentTimer && currentTimer.pausedAt !== undefined) {
+    // Reset the timer with the remaining time from when it was paused
+    currentTimer.startTime = Date.now();
+    currentTimer.remaining = currentTimer.pausedAt;
+    currentTimer.paused = false;
+
+    // Reschedule the switch timer with the remaining time
+    const currentLink = state.config.links[state.currentTabIndex];
+    if (currentLink && currentTimer.remaining > 0) {
+      const remainingMs = currentTimer.remaining * 1000;
+
+      // Clear any existing timers first
+      if (state.timers.switch) clearTimeout(state.timers.switch);
+      if (state.timers.refresh) clearTimeout(state.timers.refresh);
+
+      // Reschedule switch timer with remaining time
+      state.timers.switch = setTimeout(() => switchTab(), remainingMs);
+      console.log(`Resumed: Switch timer scheduled in ${remainingMs}ms (${currentTimer.remaining}s remaining)`);
+
+      // Check if we need to schedule refresh
+      const refreshTime = (currentTimer.remaining - currentLink.refreshBeforeSwitch) * 1000;
+      if (currentLink.refreshEnabled && refreshTime > 0) {
+        state.timers.refresh = setTimeout(() => {
+          const nextIndex = (state.currentTabIndex + 1) % state.tabs.length;
+          chrome.tabs.reload(state.tabs[nextIndex].id);
+        }, refreshTime);
+        console.log(`Resumed: Refresh scheduled in ${refreshTime}ms`);
+      }
+    }
+  } else {
+    // If no pause info, restart the current link's timer
+    scheduleCurrentLink();
+  }
+
+  // Mark all timers as unpaused
   state.linkTimers.forEach(timer => {
-    timer.startTime = Date.now();
+    if (timer !== currentTimer) {
+      timer.startTime = Date.now();
+    }
     timer.paused = false;
+    delete timer.pausedAt; // Clean up pause tracking
   });
 
   // Notify all tabs about the resume state
@@ -305,7 +357,6 @@ function resumeAllTimers() {
     }
   });
 
-  scheduleCurrentLink();
   broadcast();
 
   console.log('All timers resumed globally');
@@ -616,12 +667,15 @@ setInterval(() => {
   }
 }, 1000);
 
-// Auto-resume functionality
+// Auto-resume functionality (disabled to prevent unwanted resumes)
+// Uncomment below to enable auto-resume after 3 minutes of inactivity
+/*
 setInterval(() => {
   if (state.isPaused && Date.now() - state.lastActivityTime > 180000) {
     resumeAllTimers();
   }
 }, 30000);
+*/
 
 // Periodic tab validation (every minute)
 setInterval(async () => {

@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Don't check lock status on initial load - only lock after starting
   update();
   setInterval(update, 1000);
-  setInterval(checkAutoResume, 30000); // Check every 30 seconds
+  // Auto-resume disabled to prevent unwanted resumes
+  // setInterval(checkAutoResume, 30000); // Check every 30 seconds
 });
 
 function showLockScreen() {
@@ -125,11 +126,14 @@ function updateActivity() {
   state.lastActivityTime = Date.now();
 }
 
+// Auto-resume function (disabled to prevent unwanted resumes)
+/*
 function checkAutoResume() {
   if (state.isPaused && Date.now() - state.lastActivityTime > 180000) { // 3 minutes
     msg('continue');
   }
 }
+*/
 
 
 function load() {
