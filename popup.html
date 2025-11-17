@@ -80,6 +80,22 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </head>
 <body>
 
+<!-- Password Lock Screen -->
+<div id="lockScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;padding:30px;border-radius:8px;width:100%;max-width:350px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 20px 0;text-align:center;color:#333">🔒 Extension Locked</h3>
+    <p style="margin-bottom:20px;color:#666;text-align:center;font-size:14px">Enter password to access settings</p>
+    <div style="position:relative;margin-bottom:20px">
+      <input type="password" id="lockPassword" placeholder="Enter password" style="width:100%;padding:12px;padding-right:40px;font-size:14px;border:1px solid #ddd;border-radius:4px">
+      <button id="togglePassword" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:8px;color:#666" title="Show password">
+        <span id="eyeIcon">👁️</span>
+      </button>
+    </div>
+    <button id="unlockBtn" style="width:100%;padding:12px;background:#4CAF50;color:white;border:none;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer">Unlock</button>
+    <div id="lockError" style="margin-top:15px;color:#f44336;text-align:center;font-size:13px;display:none"></div>
+  </div>
+</div>
+
 
 <!-- Fixed Header Section -->
 <div class="header-section">
@@ -113,8 +129,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="global-content">
       <div class="form-group">
         <label for="unlockPassword">Unlock Password:</label>
-        <input type="text" id="unlockPassword" placeholder="Enter password to unlock restrictions">
-        <div class="help-text">Click 5 times then enter password to unlock</div>
+        <div style="position:relative">
+          <input type="password" id="unlockPassword" placeholder="Enter password to unlock restrictions" style="padding-right:40px">
+          <button id="toggleSettingsPassword" type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:8px;color:#666" title="Show password">
+            <span id="settingsEyeIcon">👁️</span>
+          </button>
+        </div>
+        <div class="help-text">Click 5 times then enter password to unlock. This password also locks the extension UI when kiosk is running.</div>
       </div>
       <div class="form-group">
         <div class="checkbox-group">

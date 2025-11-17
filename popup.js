@@ -11,17 +11,39 @@ const state = {
 };
 
 const el = {};
+let isUILocked = false;
+let savedPassword = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize elements
   ['saveBtn', 'startBtn', 'stopBtn', 'status', 'addLinkBtn', 'linksContainer',
-   'kioskMode', 'autoStart', 'unlockPassword'].forEach(id => {
+   'kioskMode', 'autoStart', 'unlockPassword', 'lockScreen', 'lockPassword',
+   'unlockBtn', 'lockError', 'togglePassword', 'eyeIcon', 'toggleSettingsPassword',
+   'settingsEyeIcon'].forEach(id => {
     el[id] = document.getElementById(id);
   });
 
+  // Lock screen event listeners
+  el.unlockBtn.addEventListener('click', attemptUnlock);
+  el.lockPassword.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') attemptUnlock();
+  });
+  el.togglePassword.addEventListener('click', togglePasswordVisibility);
+  el.toggleSettingsPassword.addEventListener('click', toggleSettingsPasswordVisibility);
+
   // Event listeners
   el.saveBtn.addEventListener('click', save);
-  el.startBtn.addEventListener('click', () => msg('start'));
+  el.startBtn.addEventListener('click', () => {
+    msg('start');
+    // Lock the UI after starting if password is set
+    setTimeout(() => {
+      savedPassword = state.config.unlockPassword || '';
+      if (savedPassword) {
+        isUILocked = true;
+        showLockScreen();
+      }
+    }, 100);
+  });
   el.stopBtn.addEventListener('click', () => msg('stop'));
   el.addLinkBtn.addEventListener('click', addLink);
 
@@ -32,10 +54,72 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('mousemove', updateActivity);
 
   load();
+  // Don't check lock status on initial load - only lock after starting
   update();
   setInterval(update, 1000);
   setInterval(checkAutoResume, 30000); // Check every 30 seconds
 });
+
+function showLockScreen() {
+  el.lockScreen.style.display = 'flex';
+  el.lockPassword.value = '';
+  el.lockError.style.display = 'none';
+  el.lockPassword.focus();
+}
+
+function hideLockScreen() {
+  el.lockScreen.style.display = 'none';
+  isUILocked = false;
+}
+
+function attemptUnlock() {
+  const enteredPassword = el.lockPassword.value;
+
+  if (enteredPassword === savedPassword) {
+    hideLockScreen();
+    update(); // Update UI after unlocking
+  } else {
+    el.lockError.textContent = 'Incorrect password';
+    el.lockError.style.display = 'block';
+    el.lockPassword.value = '';
+    el.lockPassword.focus();
+
+    // Hide error after 3 seconds
+    setTimeout(() => {
+      el.lockError.style.display = 'none';
+    }, 3000);
+  }
+}
+
+function togglePasswordVisibility() {
+  const passwordInput = el.lockPassword;
+  const icon = el.eyeIcon;
+
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    icon.textContent = '🙈';
+    el.togglePassword.title = 'Hide password';
+  } else {
+    passwordInput.type = 'password';
+    icon.textContent = '👁️';
+    el.togglePassword.title = 'Show password';
+  }
+}
+
+function toggleSettingsPasswordVisibility() {
+  const passwordInput = el.unlockPassword;
+  const icon = el.settingsEyeIcon;
+
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    icon.textContent = '🙈';
+    el.toggleSettingsPassword.title = 'Hide password';
+  } else {
+    passwordInput.type = 'password';
+    icon.textContent = '👁️';
+    el.toggleSettingsPassword.title = 'Show password';
+  }
+}
 
 function updateActivity() {
   state.lastActivityTime = Date.now();
@@ -348,6 +432,9 @@ function msg(action, data = null) {
 }
 
 function update() {
+  // Don't update if UI is locked
+  if (isUILocked) return;
+
   chrome.runtime.sendMessage({action: 'getStatus'}, (r) => {
     if (!r) return;
 
