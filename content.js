@@ -477,6 +477,13 @@ function createControlButtons() {
   menuButton.appendChild(statusText);
   menuButton.onclick = toggleMenu;
 
+  // Prevent context menu on the button
+  menuButton.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }, true);
+
   // Create menu container (hidden by default)
   createMenuContainer();
 
@@ -497,7 +504,7 @@ function createMenuContainer() {
     background: rgba(0, 0, 0, 0.9);
     border-radius: 20px;
     padding: 15px;
-    z-index: 999999;
+    z-index: 2147483647;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     backdrop-filter: blur(10px);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
@@ -551,8 +558,22 @@ function createMenuContainer() {
       hideMenu();
     };
 
+    // Prevent context menu on each button
+    button.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }, true);
+
     menuContainer.appendChild(button);
   });
+
+  // Prevent context menu on the container itself
+  menuContainer.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }, true);
 
   document.body.appendChild(menuContainer);
 }
