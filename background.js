@@ -14,7 +14,8 @@ const state = {
   linkTimers: [],
   timers: {},
   lastActivityTime: Date.now(),
-  globalUnlocked: false
+  globalUnlocked: false,
+  hoverModeEnabled: false
 };
 
 // Load configuration on startup
@@ -158,6 +159,10 @@ chrome.runtime.onMessage.addListener((req, sender, respond) => {
       setGlobalUnlock: (unlocked) => {
         setGlobalUnlock(unlocked);
         return {status: 'global unlock set'};
+      },
+      setHoverMode: (enabled) => {
+        setHoverMode(enabled);
+        return {status: 'hover mode set'};
       },
       exitKiosk: () => {
         exitChromeProcess();
@@ -555,7 +560,8 @@ async function broadcast() {
     unlockPassword: state.config.unlockPassword,
     currentTabTimer: currentTimer,
     unlocked: state.globalUnlocked,
-    isPaused: state.isPaused
+    isPaused: state.isPaused,
+    hoverModeEnabled: state.hoverModeEnabled
   };
 
   // Send message to each tab, ignoring failures for closed tabs
@@ -573,7 +579,8 @@ async function broadcast() {
           blockAfter: currentLink.blockClicksAfter * 1000,
                 unlockPassword: state.config.unlockPassword,
           unlocked: state.globalUnlocked,
-          isPaused: state.isPaused
+          isPaused: state.isPaused,
+          hoverModeEnabled: state.hoverModeEnabled
         });
       }
     } catch (e) {
@@ -692,7 +699,8 @@ async function sendCurrentStateToTab(tabId) {
     unlockPassword: state.config.unlockPassword,
     currentTabTimer: currentTimer,
     unlocked: state.globalUnlocked,
-    isPaused: state.isPaused
+    isPaused: state.isPaused,
+    hoverModeEnabled: state.hoverModeEnabled
   };
 
   try {
@@ -713,6 +721,23 @@ function setGlobalUnlock(unlocked) {
       await chrome.tabs.sendMessage(tab.id, {
         action: 'updateUnlockState',
         unlocked: unlocked
+      });
+    } catch (e) {
+      // Tab might not be ready
+    }
+  });
+}
+
+// Hover mode state management
+function setHoverMode(enabled) {
+  state.hoverModeEnabled = enabled;
+
+  // Notify all tabs about the new hover mode state
+  state.tabs.forEach(async (tab) => {
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'updateHoverMode',
+        hoverModeEnabled: enabled
       });
     } catch (e) {
       // Tab might not be ready

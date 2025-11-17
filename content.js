@@ -20,6 +20,7 @@ let unlockClickCount = 0;
 let lastUserActivity = Date.now();
 let inactivityTimer = null;
 let unlockInProgress = false;
+let hoverModeEnabled = false;
 
 // Initialize content script - check if kiosk mode is running
 function initializeContentScript() {
@@ -75,6 +76,11 @@ chrome.runtime.onMessage.addListener((req) => {
       console.log('Updating pause state from background:', req.isPaused);
       isPaused = req.isPaused;
     }
+    // Update hover mode state from background
+    if (req.hasOwnProperty('hoverModeEnabled')) {
+      console.log('Updating hover mode from background:', req.hoverModeEnabled);
+      hoverModeEnabled = req.hoverModeEnabled;
+    }
     clickCount = 0;
     unlockClickCount = 0;
     currentTabTimer = req.currentTabTimer;
@@ -111,6 +117,14 @@ chrome.runtime.onMessage.addListener((req) => {
     } else {
       // Resume scheduling when resumed globally
       schedule();
+    }
+  } else if (req.action === 'updateHoverMode') {
+    hoverModeEnabled = req.hoverModeEnabled;
+    updateBlockingOverlay();
+    // Update button text in menu if visible
+    if (menuVisible && menuContainer) {
+      hideMenu();
+      showMenu();
     }
   } else if (req.action === 'enterFullscreen') {
     enterFullscreen();
@@ -259,7 +273,8 @@ function removeBlockingOverlay() {
 }
 
 function updateBlockingOverlay() {
-  const shouldHaveOverlay = blocked && !unlocked && !isPaused;
+  // Don't show overlay if hover mode is enabled - this allows hover but still blocks clicks
+  const shouldHaveOverlay = blocked && !unlocked && !isPaused && !hoverModeEnabled;
 
   if (shouldHaveOverlay) {
     createBlockingOverlay();
@@ -517,6 +532,7 @@ function createMenuContainer() {
   const buttons = [
     { id: 'pause', text: isPaused ? '▶️ Resume' : '⏸️ Pause', action: togglePause },
     { id: 'next', text: '⏭️ Next', action: switchToNextTab },
+    { id: 'hover', text: hoverModeEnabled ? '🚫 Disable Hover' : '👆 Enable Hover', action: toggleHoverMode },
     { id: 'lock', text: unlocked ? '🔒 Lock' : '🔓 Unlock', action: unlocked ? performLock : attemptUnlock },
     ...(unlocked ? [
       { id: 'exit', text: '❌ Exit', action: exitKiosk }
@@ -675,6 +691,26 @@ function togglePause() {
 function switchToNextTab() {
   chrome.runtime.sendMessage({action: 'forceNextTab'});
   showNextTabNotification();
+}
+
+function toggleHoverMode() {
+  hoverModeEnabled = !hoverModeEnabled;
+  updateBlockingOverlay();
+
+  if (hoverModeEnabled) {
+    showNotification('Hover Mode Enabled - Hover allowed, clicks blocked', 'rgba(138, 43, 226, 0.9)');
+  } else {
+    showNotification('Hover Mode Disabled - All interactions blocked', 'rgba(220, 53, 69, 0.9)');
+  }
+
+  // Update button text in menu
+  if (menuVisible && menuContainer) {
+    hideMenu();
+    showMenu();
+  }
+
+  // Notify other tabs about hover mode state
+  chrome.runtime.sendMessage({action: 'setHoverMode', data: hoverModeEnabled});
 }
 
 function exitKiosk() {
