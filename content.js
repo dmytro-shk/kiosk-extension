@@ -857,7 +857,7 @@ function showPauseNotification() {
     opacity: 1;
     transition: opacity 0.3s ease;
   `;
-  notification.textContent = 'Timer Paused - Clicks Unlocked';
+  notification.textContent = allowClicksForThisLink ? 'Timer Paused - Clicks Unlocked' : 'Timer Paused - Clicks Locked';
 
   document.body.appendChild(notification);
 
