@@ -42,7 +42,11 @@ function loadConfig() {
             switchInterval: config.switchInterval || 30,
             refreshBeforeSwitch: config.refreshBeforeSwitch || 5,
             refreshEnabled: true,
-            blockClicksAfter: config.blockClicksAfter || 120
+            blockClicksAfter: config.blockClicksAfter || 120,
+            allowClicks: false,
+            escapeEnabled: false,
+            escapeFrequency: 10,
+            escapeMaxTimes: 5
           });
           if (config.url2) links.push({
             id: 'link_2',
@@ -50,7 +54,11 @@ function loadConfig() {
             switchInterval: config.switchInterval || 30,
             refreshBeforeSwitch: config.refreshBeforeSwitch || 5,
             refreshEnabled: true,
-            blockClicksAfter: config.blockClicksAfter || 120
+            blockClicksAfter: config.blockClicksAfter || 120,
+            allowClicks: false,
+            escapeEnabled: false,
+            escapeFrequency: 10,
+            escapeMaxTimes: 5
           });
 
           state.config = {
@@ -70,6 +78,36 @@ function loadConfig() {
           });
         } else {
           Object.assign(state.config, config);
+
+          // Migrate existing links to include escape settings if missing
+          if (state.config.links) {
+            let needsMigration = false;
+            state.config.links = state.config.links.map(link => {
+              if (!link.hasOwnProperty('escapeEnabled')) {
+                needsMigration = true;
+                return {
+                  ...link,
+                  escapeEnabled: false,
+                  escapeFrequency: 10,
+                  escapeMaxTimes: 5
+                };
+              }
+              return link;
+            });
+
+            // Save migrated config if needed
+            if (needsMigration) {
+              console.log('[Background] Migrating existing links to include escape settings');
+              chrome.storage.sync.set({config: state.config}, () => {
+                if (chrome.runtime.lastError) {
+                  console.error('[Background] Failed to save escaped-migrated config:', chrome.runtime.lastError);
+                } else {
+                  console.log('[Background] Escape-migrated config saved');
+                }
+              });
+            }
+          }
+
           console.log('[Background] Config loaded successfully:', state.config);
         }
       } else {
@@ -673,7 +711,10 @@ async function broadcast() {
     unlocked: state.globalUnlocked,
     isPaused: state.isPaused,
     hoverModeEnabled: state.hoverModeEnabled,
-    allowClicks: currentLink.allowClicks || false
+    allowClicks: currentLink.allowClicks || false,
+    escapeEnabled: currentLink.escapeEnabled || false,
+    escapeFrequency: currentLink.escapeFrequency || 10,
+    escapeMaxTimes: currentLink.escapeMaxTimes || 5
   };
 
   // Send message to each tab, ignoring failures for closed tabs
@@ -694,7 +735,10 @@ async function broadcast() {
           unlocked: state.globalUnlocked,
           isPaused: state.isPaused,
           hoverModeEnabled: state.hoverModeEnabled,
-          allowClicks: inactiveTabLink ? (inactiveTabLink.allowClicks || false) : false
+          allowClicks: inactiveTabLink ? (inactiveTabLink.allowClicks || false) : false,
+          escapeEnabled: inactiveTabLink ? (inactiveTabLink.escapeEnabled || false) : false,
+          escapeFrequency: inactiveTabLink ? (inactiveTabLink.escapeFrequency || 10) : 10,
+          escapeMaxTimes: inactiveTabLink ? (inactiveTabLink.escapeMaxTimes || 5) : 5
         });
       }
     } catch (e) {
@@ -816,7 +860,10 @@ async function sendCurrentStateToTab(tabId) {
     unlocked: state.globalUnlocked,
     isPaused: state.isPaused,
     hoverModeEnabled: state.hoverModeEnabled,
-    allowClicks: currentLink.allowClicks || false
+    allowClicks: currentLink.allowClicks || false,
+    escapeEnabled: currentLink.escapeEnabled || false,
+    escapeFrequency: currentLink.escapeFrequency || 10,
+    escapeMaxTimes: currentLink.escapeMaxTimes || 5
   };
 
   try {

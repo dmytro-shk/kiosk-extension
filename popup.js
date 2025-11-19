@@ -203,7 +203,10 @@ function createDefaultLink(url) {
     refreshBeforeSwitch: 5,
     refreshEnabled: true,
     blockClicksAfter: 120,
-    allowClicks: false
+    allowClicks: false,
+    escapeEnabled: false,
+    escapeFrequency: 10,
+    escapeMaxTimes: 5
   };
 }
 
@@ -301,6 +304,26 @@ function createLinkElement(link, index) {
         </label>
         <div class="help-text" style="margin-left: 20px; margin-top: 2px;">Override blocking for this link</div>
       </div>
+      <div>
+        <label style="color: #ff6b35; font-weight: 600;">
+          <input type="checkbox" class="link-checkbox-input" ${link.escapeEnabled ? 'checked' : ''}
+                 data-link-id="${link.id}" data-field="escapeEnabled">
+          ⌨️ Auto ESC Key
+        </label>
+        <div class="help-text" style="margin-left: 20px; margin-top: 2px;">Automatically press Escape key</div>
+      </div>
+      <div>
+        <label>ESC Frequency (sec):</label>
+        <input type="number" class="link-number-input" value="${link.escapeFrequency}" min="1" max="300"
+               data-link-id="${link.id}" data-field="escapeFrequency"
+               ${!link.escapeEnabled ? 'disabled' : ''}>
+      </div>
+      <div>
+        <label>Max ESC Times:</label>
+        <input type="number" class="link-number-input" value="${link.escapeMaxTimes}" min="1" max="100"
+               data-link-id="${link.id}" data-field="escapeMaxTimes"
+               ${!link.escapeEnabled ? 'disabled' : ''}>
+      </div>
     </div>
 
   `;
@@ -358,6 +381,17 @@ function updateLinkField(linkId, field, value) {
       if (linkElement) {
         const refreshInput = linkElement.querySelector('input[data-field="refreshBeforeSwitch"]');
         if (refreshInput) refreshInput.disabled = !value;
+      }
+    }
+
+    // Special handling for escape enabled/disabled
+    if (field === 'escapeEnabled') {
+      const linkElement = document.querySelector(`[data-link-id="${linkId}"]`);
+      if (linkElement) {
+        const escapeFrequencyInput = linkElement.querySelector('input[data-field="escapeFrequency"]');
+        const escapeMaxTimesInput = linkElement.querySelector('input[data-field="escapeMaxTimes"]');
+        if (escapeFrequencyInput) escapeFrequencyInput.disabled = !value;
+        if (escapeMaxTimesInput) escapeMaxTimesInput.disabled = !value;
       }
     }
 

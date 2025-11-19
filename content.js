@@ -22,6 +22,11 @@ let inactivityTimer = null;
 let unlockInProgress = false;
 let hoverModeEnabled = false;
 let allowClicksForThisLink = false;
+let escapeEnabled = false;
+let escapeFrequency = 10;
+let escapeMaxTimes = 5;
+let escapeTimer = null;
+let escapeCount = 0;
 
 // Initialize content script - check if kiosk mode is running
 function initializeContentScript() {
@@ -87,6 +92,19 @@ chrome.runtime.onMessage.addListener((req) => {
       console.log('Updating allow clicks from background:', req.allowClicks);
       allowClicksForThisLink = req.allowClicks;
     }
+    // Update escape key settings from background
+    if (req.hasOwnProperty('escapeEnabled')) {
+      console.log('Updating escape settings from background:', req.escapeEnabled, req.escapeFrequency, req.escapeMaxTimes);
+      escapeEnabled = req.escapeEnabled;
+      escapeFrequency = req.escapeFrequency || 10;
+      escapeMaxTimes = req.escapeMaxTimes || 5;
+
+      // Reset escape functionality when settings change
+      stopEscapeSimulation();
+      if (escapeEnabled && !isPaused) {
+        startEscapeSimulation();
+      }
+    }
     clickCount = 0;
     unlockClickCount = 0;
     currentTabTimer = req.currentTabTimer;
@@ -125,9 +143,15 @@ chrome.runtime.onMessage.addListener((req) => {
     if (isPaused) {
       // Clear any existing timers when paused globally
       if (timer) clearTimeout(timer);
+      // Stop escape simulation when paused
+      stopEscapeSimulation();
     } else {
       // Resume scheduling when resumed globally
       schedule();
+      // Resume escape simulation when resumed (if enabled)
+      if (escapeEnabled) {
+        startEscapeSimulation();
+      }
     }
   } else if (req.action === 'updateHoverMode') {
     hoverModeEnabled = req.hoverModeEnabled;
@@ -150,10 +174,18 @@ chrome.runtime.onMessage.addListener((req) => {
     if (unlocked) {
       startInactivityTimer();
     }
+    // Reset escape counter when tab becomes active
+    resetEscapeCounter();
+    // Start escape simulation if enabled and not paused
+    if (escapeEnabled && !isPaused) {
+      startEscapeSimulation();
+    }
   } else if (req.action === 'tabBecameInactive') {
     removeControlButtons();
     removeTimerDisplay();
     stopInactivityTimer();
+    // Stop escape simulation when tab becomes inactive
+    stopEscapeSimulation();
   }
 });
 
@@ -1139,10 +1171,74 @@ document.addEventListener('keydown', (e) => {
   }
 }, true);
 
+// Escape key simulation functions
+function startEscapeSimulation() {
+  if (!escapeEnabled || escapeCount >= escapeMaxTimes || isPaused) {
+    return;
+  }
+
+  console.log(`Starting escape simulation: frequency=${escapeFrequency}s, maxTimes=${escapeMaxTimes}, currentCount=${escapeCount}`);
+
+  escapeTimer = setTimeout(() => {
+    if (escapeEnabled && escapeCount < escapeMaxTimes && !isPaused) {
+      simulateEscapeKey();
+      escapeCount++;
+      console.log(`ESC key simulated (${escapeCount}/${escapeMaxTimes})`);
+
+      // Schedule next escape if we haven't reached max
+      if (escapeCount < escapeMaxTimes) {
+        startEscapeSimulation();
+      }
+    }
+  }, escapeFrequency * 1000);
+}
+
+function stopEscapeSimulation() {
+  if (escapeTimer) {
+    clearTimeout(escapeTimer);
+    escapeTimer = null;
+    console.log('Escape simulation stopped');
+  }
+}
+
+function simulateEscapeKey() {
+  // Simulate Escape key press
+  const escapeEvent = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    code: 'Escape',
+    keyCode: 27,
+    which: 27,
+    bubbles: true,
+    cancelable: true
+  });
+
+  document.dispatchEvent(escapeEvent);
+
+  // Also dispatch keyup for completeness
+  const escapeEventUp = new KeyboardEvent('keyup', {
+    key: 'Escape',
+    code: 'Escape',
+    keyCode: 27,
+    which: 27,
+    bubbles: true,
+    cancelable: true
+  });
+
+  document.dispatchEvent(escapeEventUp);
+  console.log('ESC key event dispatched');
+}
+
+// Reset escape counter when tab becomes active
+function resetEscapeCounter() {
+  escapeCount = 0;
+  console.log('Escape counter reset');
+}
+
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {
   intervals.forEach(clearInterval);
   if (timer) clearTimeout(timer);
+  stopEscapeSimulation();
 });
 
 })(); // End IIFE
