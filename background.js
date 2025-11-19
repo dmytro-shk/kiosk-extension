@@ -252,7 +252,7 @@ function initializeLinkTimers() {
     linkId: link.id,
     total: link.switchInterval,
     remaining: link.switchInterval,
-    startTime: Date.now(),
+    startTime: index === 0 ? Date.now() : null, // Only set startTime for the first tab
     paused: false
   }));
 }
@@ -303,8 +303,7 @@ function resumeAllTimers() {
   // Get the current timer to resume from where it was paused
   const currentTimer = state.linkTimers[state.currentTabIndex];
   if (currentTimer && currentTimer.pausedAt !== undefined) {
-    // Reset the timer with the remaining time from when it was paused
-    currentTimer.startTime = Date.now();
+    // Keep the remaining time from when it was paused (don't reset startTime)
     currentTimer.remaining = currentTimer.pausedAt;
     currentTimer.paused = false;
 
@@ -381,8 +380,11 @@ function resumeCurrentTabTimer() {
   if (!state.isRunning || state.isPaused) return;
 
   const currentTimer = state.linkTimers[state.currentTabIndex];
-  if (currentTimer && currentTimer.paused) {
+  const currentLink = state.config.links[state.currentTabIndex];
+  if (currentTimer && currentTimer.paused && currentLink) {
     currentTimer.paused = false;
+    // Reset to full time when resuming individual tab
+    currentTimer.remaining = currentLink.switchInterval;
     currentTimer.startTime = Date.now();
 
     // Restart the timer for this tab
@@ -431,8 +433,11 @@ function scheduleCurrentLink() {
   state.timers.switch = setTimeout(() => switchTab(), switchTime);
   console.log(`Switch timer scheduled in ${switchTime}ms for tab ${state.currentTabIndex + 1}`);
 
-  currentTimer.startTime = Date.now();
-  currentTimer.remaining = currentLink.switchInterval; // Reset remaining to full interval
+  // Only reset timer if it's a new scheduling (not from pause/resume)
+  if (!currentTimer.startTime || currentTimer.remaining === 0) {
+    currentTimer.startTime = Date.now();
+    currentTimer.remaining = currentLink.switchInterval;
+  }
 }
 
 async function refresh() {
@@ -555,12 +560,14 @@ async function switchTab() {
     }
   }
 
-  const currentTimer = state.linkTimers[state.currentTabIndex];
-  if (currentTimer) {
-    currentTimer.remaining = currentTimer.total;
-  }
-
   state.currentTabIndex = (state.currentTabIndex + 1) % state.tabs.length;
+
+  // Reset the new current tab's timer
+  const newTimer = state.linkTimers[state.currentTabIndex];
+  if (newTimer) {
+    newTimer.remaining = newTimer.total;
+    newTimer.startTime = Date.now();
+  }
 
   try {
     // First, verify the tab still exists
@@ -650,8 +657,8 @@ setInterval(() => {
 
   state.linkTimers.forEach((timer, index) => {
     if (timer.startTime && !timer.paused) {
-      const elapsed = Math.floor((Date.now() - timer.startTime) / 1000);
-      timer.remaining = Math.max(0, timer.total - elapsed);
+      // Decrement by 1 second instead of recalculating from startTime to avoid drift
+      timer.remaining = Math.max(0, timer.remaining - 1);
     }
   });
 
@@ -706,11 +713,9 @@ async function validateAllTabsExist() {
 async function forceNextTab() {
   if (!state.isRunning || !state.tabs.length) return;
 
-  // Reset the current tab timer
-  const currentTimer = state.linkTimers[state.currentTabIndex];
-  if (currentTimer) {
-    currentTimer.remaining = currentTimer.total;
-  }
+  // Clear current timers before forcing switch
+  Object.values(state.timers).forEach(t => t && clearTimeout(t));
+  state.timers = {};
 
   // Manually switch to next tab
   await switchTab();
