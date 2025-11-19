@@ -33,9 +33,9 @@ A powerful Chrome extension for creating interactive kiosk displays with advance
 
 ### 🔐 **Security Features**
 - Password protection for unlocking interactions
-- Extension UI lock - prevents unauthorized settings changes
 - Auto-lock after 5 minutes of inactivity
 - Password visibility toggle for secure entry
+- Dynamic permissions - only requests access to configured websites
 
 ### ⚙️ **Configuration Options**
 - Fullscreen mode support
@@ -45,6 +45,20 @@ A powerful Chrome extension for creating interactive kiosk displays with advance
   - Refresh timing
   - Click blocking delay
   - Allow clicks override
+  - Auto ESC key simulation
+
+### ⌨️ **Auto ESC Key Simulation**
+- Simulate ESC key presses automatically on each tab
+- Configurable frequency (1-300 seconds)
+- Set maximum times per tab visit (1-100)
+- Counter resets on each tab switch
+- Respects pause/resume state
+
+### 💾 **Backup & Restore**
+- Export all settings to JSON file
+- Import configuration from backup
+- Easy deployment across multiple devices
+- Version tracking and validation
 
 ## Installation
 
@@ -79,6 +93,9 @@ Each link has individual settings:
 - **Enable Refresh**: Toggle page refresh on/off
 - **Block Clicks After**: Start blocking interactions after X seconds
 - **✓ Allow Clicks**: Override blocking for this specific link
+- **⌨️ Auto ESC Key**: Enable automatic ESC key simulation
+- **ESC Frequency**: How often to press ESC (seconds)
+- **Max ESC Times**: Maximum ESC presses per tab visit
 
 ### Unlocking Interactions
 
@@ -158,10 +175,10 @@ The extension works across:
 - Check for extra spaces
 - Re-save settings if password was recently changed
 
-### Extension UI Locked
-- This happens when kiosk is running with a password
-- Enter the same password used for unlock
-- Stop the kiosk to regain immediate access
+### Settings Export/Import
+- Click "📤 Export Settings" to download configuration as JSON
+- Click "📥 Import Settings" to restore from backup file
+- Useful for deploying identical setups across multiple devices
 
 ## Browser Compatibility
 
@@ -173,11 +190,15 @@ The extension works across:
 
 Required permissions:
 - **tabs**: Switch between tabs
-- **storage**: Save configuration
-- **scripting**: Inject content scripts
-- **webNavigation**: Track page loads
-- **windows**: Fullscreen support
-- **host_permissions**: Access all sites (for click blocking)
+- **storage**: Save configuration locally
+- **scripting**: Inject content scripts for kiosk controls
+- **webNavigation**: Track page loads for timing
+- **windows**: Create fullscreen kiosk displays
+- **activeTab**: Basic tab management
+
+Optional permissions (requested dynamically):
+- **Host access**: Only for user-configured websites
+- **User consent required**: Chrome shows permission dialog for each domain
 
 ## Support
 
@@ -192,9 +213,17 @@ This extension is provided as-is for personal and commercial use.
 
 ## Version
 
-Current Version: 1.0.0
+Current Version: 1.1.0
 
 ## Changelog
+
+### Version 1.1.0
+- ⌨️ **NEW**: Auto ESC Key Simulation with configurable frequency and limits
+- 💾 **NEW**: JSON Settings Export/Import for easy backup and deployment
+- 🔒 **IMPROVED**: Dynamic permissions - only requests access to configured websites
+- 🧹 **REMOVED**: Extension UI lock during kiosk mode (accessibility improvement)
+- 🐛 **FIXED**: Pause behavior with timer at 0 seconds
+- 🎨 **ENHANCED**: Better error handling and user feedback
 
 ### Version 1.0.0
 - Initial release
@@ -204,6 +233,5 @@ Current Version: 1.0.0
 - Hover mode for partial interaction
 - Per-link click override
 - Interactive control panel
-- Extension UI lock
 - Fullscreen support
 - Auto-start capability
