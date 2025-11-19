@@ -131,12 +131,12 @@ function checkAutoResume() {
 
 
 function load() {
-  console.log('Loading config from storage...');
+  //console.log('Loading config from storage...');
 
   chrome.storage.sync.get(['config'], (result) => {
     // Check for errors
     if (chrome.runtime.lastError) {
-      console.error('Failed to load config:', chrome.runtime.lastError);
+      //console.error('Failed to load config:', chrome.runtime.lastError);
       // Initialize with defaults on error
       state.links = [
         createDefaultLink('https://example.com'),
@@ -147,11 +147,11 @@ function load() {
     }
 
     const config = result.config;
-    console.log('Loaded config:', config);
+    //console.log('Loaded config:', config);
 
     if (!config) {
       // Initialize with default links if none exist
-      console.log('No config found, using defaults');
+      //console.log('No config found, using defaults');
       state.links = [
         createDefaultLink('https://example.com'),
         createDefaultLink('https://example2.com')
@@ -162,12 +162,12 @@ function load() {
 
     // Handle migration from old config format
     if (config.url1 || config.url2) {
-      console.log('Migrating from old format');
+      //console.log('Migrating from old format');
       state.links = [];
       if (config.url1) state.links.push(createDefaultLink(config.url1));
       if (config.url2) state.links.push(createDefaultLink(config.url2));
     } else if (config.links && config.links.length > 0) {
-      console.log('Loading saved links:', config.links);
+      //console.log('Loading saved links:', config.links);
       // Convert any numeric IDs to strings to avoid CSS selector issues
       state.links = config.links.map(link => ({
         ...link,
@@ -175,7 +175,7 @@ function load() {
       }));
     } else {
       // No links found, use defaults
-      console.log('No links in config, using defaults');
+      //console.log('No links in config, using defaults');
       state.links = [
         createDefaultLink('https://example.com'),
         createDefaultLink('https://example2.com')
@@ -189,7 +189,7 @@ function load() {
       unlockPassword: config.unlockPassword || ''
     };
 
-    console.log('Final state after load:', state);
+    //console.log('Final state after load:', state);
     loadGlobalSettings();
     renderLinks();
   });
@@ -439,17 +439,17 @@ function save() {
     ...state.config
   };
 
-  console.log('Saving config:', configToSave);
+  //console.log('Saving config:', configToSave);
 
   chrome.storage.sync.set({config: configToSave}, () => {
     // Check for errors
     if (chrome.runtime.lastError) {
-      console.error('Failed to save:', chrome.runtime.lastError);
+      //console.error('Failed to save:', chrome.runtime.lastError);
       alert('Failed to save settings: ' + chrome.runtime.lastError.message);
       return;
     }
 
-    console.log('Config saved successfully');
+    //console.log('Config saved successfully');
 
     const orig = el.saveBtn.textContent;
     const col = el.saveBtn.style.backgroundColor;
@@ -462,7 +462,7 @@ function save() {
 
     // Verify the save by reading it back
     chrome.storage.sync.get(['config'], (result) => {
-      console.log('Verification - saved config:', result.config);
+      //console.log('Verification - saved config:', result.config);
     });
   });
 }

@@ -20,21 +20,21 @@ const state = {
 
 // Load configuration on startup
 function loadConfig() {
-  console.log('[Background] Loading config from storage...');
+  //console.log('[Background] Loading config from storage...');
   try {
     chrome.storage.sync.get(['config'], (result) => {
       if (chrome.runtime.lastError) {
-        console.error('[Background] Storage error:', chrome.runtime.lastError);
+        //console.error('[Background] Storage error:', chrome.runtime.lastError);
         return;
       }
 
       const config = result.config;
-      console.log('[Background] Loaded config:', config);
+      //console.log('[Background] Loaded config:', config);
 
       if (config) {
         // Handle migration from old format
         if (config.url1 || config.url2) {
-          console.log('[Background] Migrating from old format');
+          //console.log('[Background] Migrating from old format');
           const links = [];
           if (config.url1) links.push({
             id: 'link_1',
@@ -68,12 +68,12 @@ function loadConfig() {
             unlockPassword: config.unlockPassword || ''
           };
 
-          console.log('[Background] Saving migrated config');
+          //console.log('[Background] Saving migrated config');
           chrome.storage.sync.set({config: state.config}, () => {
             if (chrome.runtime.lastError) {
-              console.error('[Background] Failed to save migrated config:', chrome.runtime.lastError);
+              //console.error('[Background] Failed to save migrated config:', chrome.runtime.lastError);
             } else {
-              console.log('[Background] Migrated config saved');
+              //console.log('[Background] Migrated config saved');
             }
           });
         } else {
@@ -97,25 +97,25 @@ function loadConfig() {
 
             // Save migrated config if needed
             if (needsMigration) {
-              console.log('[Background] Migrating existing links to include escape settings');
+              //console.log('[Background] Migrating existing links to include escape settings');
               chrome.storage.sync.set({config: state.config}, () => {
                 if (chrome.runtime.lastError) {
-                  console.error('[Background] Failed to save escaped-migrated config:', chrome.runtime.lastError);
+                  //console.error('[Background] Failed to save escaped-migrated config:', chrome.runtime.lastError);
                 } else {
-                  console.log('[Background] Escape-migrated config saved');
+                  //console.log('[Background] Escape-migrated config saved');
                 }
               });
             }
           }
 
-          console.log('[Background] Config loaded successfully:', state.config);
+          //console.log('[Background] Config loaded successfully:', state.config);
         }
       } else {
-        console.log('[Background] No config found in storage');
+        //console.log('[Background] No config found in storage');
       }
     });
   } catch (error) {
-    console.error('[Background] Failed to load config:', error);
+    //console.error('[Background] Failed to load config:', error);
   }
 }
 
@@ -124,16 +124,16 @@ loadConfig();
 chrome.storage.onChanged.addListener((changes, namespace) => {
   try {
     if (namespace === 'sync' && changes.config) {
-      console.log('[Background] Storage changed:', changes.config);
+      //console.log('[Background] Storage changed:', changes.config);
 
       if (changes.config.newValue) {
         const oldConfig = state.config;
         Object.assign(state.config, changes.config.newValue);
-        console.log('[Background] Updated config:', state.config);
+        //console.log('[Background] Updated config:', state.config);
 
         if (state.isRunning) {
           // Instead of restarting everything, just update the timers and broadcast
-          console.log('[Background] Updating running kiosk with new config');
+          //console.log('[Background] Updating running kiosk with new config');
 
           // Clear any existing timers
           Object.values(state.timers).forEach(t => t && clearTimeout(t));
@@ -146,7 +146,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       }
     }
   } catch (error) {
-    console.error('[Background] Storage change handler error:', error);
+    //console.error('[Background] Storage change handler error:', error);
   }
 });
 
@@ -219,7 +219,7 @@ chrome.runtime.onMessage.addListener((req, sender, respond) => {
     if (action) respond(action);
     return true;
   } catch (error) {
-    console.error('Message handler error:', error);
+    //console.error('Message handler error:', error);
     respond({error: error.message});
     return true;
   }
@@ -240,7 +240,7 @@ async function startKioskMode() {
   if (state.isRunning) return;
 
   if (!state.config.links || state.config.links.length === 0) {
-    console.error('No links configured');
+    //console.error('No links configured');
     return;
   }
 
@@ -250,7 +250,7 @@ async function startKioskMode() {
       const url = new URL(link.url);
       return `${url.protocol}//${url.hostname}/*`;
     } catch (e) {
-      console.warn(`Invalid URL: ${link.url}`);
+      //console.warn(`Invalid URL: ${link.url}`);
       return null;
     }
   }).filter(Boolean);
@@ -262,12 +262,12 @@ async function startKioskMode() {
       });
 
       if (!hasPermissions) {
-        console.error('Required permissions not granted');
+        //console.error('Required permissions not granted');
         return;
       }
-      console.log('Permissions granted for:', urls);
+      //console.log('Permissions granted for:', urls);
     } catch (e) {
-      console.error('Permission request failed:', e);
+      //console.error('Permission request failed:', e);
       return;
     }
   }
@@ -294,7 +294,7 @@ async function startKioskMode() {
     broadcast();
     scheduleCurrentLink();
   } catch (e) {
-    console.error('Start failed:', e);
+    //console.error('Start failed:', e);
     stopKioskMode();
   }
 }
@@ -326,9 +326,9 @@ async function stopKioskMode() {
   //   if (urls.length > 0) {
   //     try {
   //       await chrome.permissions.remove({ origins: urls });
-  //       console.log('Permissions revoked for:', urls);
+  //       //console.log('Permissions revoked for:', urls);
   //     } catch (e) {
-  //       console.warn('Failed to revoke permissions:', e);
+  //       //console.warn('Failed to revoke permissions:', e);
   //     }
   //   }
   // }
@@ -379,7 +379,7 @@ function pauseAllTimers() {
     }
   });
 
-  console.log('All timers paused globally');
+  //console.log('All timers paused globally');
 }
 
 function resumeAllTimers() {
@@ -405,7 +405,7 @@ function resumeAllTimers() {
 
       // Reschedule switch timer with remaining time
       state.timers.switch = setTimeout(() => switchTab(), remainingMs);
-      console.log(`Resumed: Switch timer scheduled in ${remainingMs}ms (${currentTimer.remaining}s remaining)`);
+      //console.log(`Resumed: Switch timer scheduled in ${remainingMs}ms (${currentTimer.remaining}s remaining)`);
 
       // Check if we need to schedule refresh
       const refreshTime = (currentTimer.remaining - currentLink.refreshBeforeSwitch) * 1000;
@@ -414,11 +414,11 @@ function resumeAllTimers() {
           const nextIndex = (state.currentTabIndex + 1) % state.tabs.length;
           chrome.tabs.reload(state.tabs[nextIndex].id);
         }, refreshTime);
-        console.log(`Resumed: Refresh scheduled in ${refreshTime}ms`);
+        //console.log(`Resumed: Refresh scheduled in ${refreshTime}ms`);
       }
     } else if (currentTimer.remaining <= 0) {
       // If timer expired (0 or less seconds), switch immediately
-      console.log(`Resumed: Timer already expired (${currentTimer.remaining}s remaining), switching tab immediately`);
+      //console.log(`Resumed: Timer already expired (${currentTimer.remaining}s remaining), switching tab immediately`);
       setTimeout(() => switchTab(), 0);
     }
   } else {
@@ -449,7 +449,7 @@ function resumeAllTimers() {
 
   broadcast();
 
-  console.log('All timers resumed globally');
+  //console.log('All timers resumed globally');
 }
 
 function pauseCurrentTabTimer() {
@@ -463,7 +463,7 @@ function pauseCurrentTabTimer() {
     Object.values(state.timers).forEach(t => t && clearTimeout(t));
     state.timers = {};
 
-    console.log(`Paused timer for tab ${state.currentTabIndex + 1}`);
+    //console.log(`Paused timer for tab ${state.currentTabIndex + 1}`);
   }
 }
 
@@ -481,7 +481,7 @@ function resumeCurrentTabTimer() {
     // Restart the timer for this tab
     scheduleCurrentLink();
 
-    console.log(`Resumed timer for tab ${state.currentTabIndex + 1}`);
+    //console.log(`Resumed timer for tab ${state.currentTabIndex + 1}`);
   }
 }
 
@@ -506,23 +506,23 @@ function scheduleCurrentLink() {
 
   // Safety check: ensure we have the corresponding link config
   if (!nextLink) {
-    console.warn(`No link config found for next index ${nextIndex}, skipping refresh scheduling`);
+    //console.warn(`No link config found for next index ${nextIndex}, skipping refresh scheduling`);
   }
 
   const refreshTime = nextLink?.refreshEnabled ?
     Math.max(0, switchTime - (nextLink.refreshBeforeSwitch * 1000)) : -1;
 
-  console.log(`Scheduling for tab ${state.currentTabIndex + 1}: nextTab=${nextIndex + 1}, nextTabRefreshEnabled=${nextLink?.refreshEnabled}, refreshTime=${refreshTime}, switchTime=${switchTime}`);
+  //console.log(`Scheduling for tab ${state.currentTabIndex + 1}: nextTab=${nextIndex + 1}, nextTabRefreshEnabled=${nextLink?.refreshEnabled}, refreshTime=${refreshTime}, switchTime=${switchTime}`);
 
   if (nextLink?.refreshEnabled && refreshTime > 0 && refreshTime < switchTime) {
     state.timers.refresh = setTimeout(() => refresh(), refreshTime);
-    console.log(`Refresh scheduled in ${refreshTime}ms for next tab ${nextIndex + 1}`);
+    //console.log(`Refresh scheduled in ${refreshTime}ms for next tab ${nextIndex + 1}`);
   } else {
-    console.log(`Refresh NOT scheduled for next tab ${nextIndex + 1} - refreshEnabled: ${nextLink?.refreshEnabled}`);
+    //console.log(`Refresh NOT scheduled for next tab ${nextIndex + 1} - refreshEnabled: ${nextLink?.refreshEnabled}`);
   }
 
   state.timers.switch = setTimeout(() => switchTab(), switchTime);
-  console.log(`Switch timer scheduled in ${switchTime}ms for tab ${state.currentTabIndex + 1}`);
+  //console.log(`Switch timer scheduled in ${switchTime}ms for tab ${state.currentTabIndex + 1}`);
 
   // Only reset timer if it's a new scheduling (not from pause/resume)
   if (!currentTimer.startTime || currentTimer.remaining === 0) {
@@ -537,17 +537,17 @@ async function refresh() {
   const nextIndex = (state.currentTabIndex + 1) % state.tabs.length;
   const nextLink = state.config.links[nextIndex];
 
-  console.log(`Refresh function called - refreshing next tab ${nextIndex + 1}, refreshEnabled: ${nextLink?.refreshEnabled}`);
+  //console.log(`Refresh function called - refreshing next tab ${nextIndex + 1}, refreshEnabled: ${nextLink?.refreshEnabled}`);
 
   // Safety check: ensure we have the corresponding link config
   if (!nextLink) {
-    console.warn(`No link config found for next index ${nextIndex}, skipping refresh`);
+    //console.warn(`No link config found for next index ${nextIndex}, skipping refresh`);
     return;
   }
 
   // Double-check if refresh is still enabled for the NEXT tab (the one we're refreshing)
   if (!nextLink.refreshEnabled) {
-    console.log('Refresh called but next tab refreshEnabled is false, skipping refresh');
+    //console.log('Refresh called but next tab refreshEnabled is false, skipping refresh');
     return;
   }
 
@@ -555,14 +555,14 @@ async function refresh() {
     // Verify tab exists before refreshing
     const tabExists = await validateTab(state.tabs[nextIndex].id);
     if (!tabExists) {
-      console.log('Tab to refresh no longer exists, skipping refresh');
+      //console.log('Tab to refresh no longer exists, skipping refresh');
       return;
     }
 
     await chrome.tabs.reload(state.tabs[nextIndex].id);
-    console.log(`Refreshed next tab ${nextIndex + 1}`);
+    //console.log(`Refreshed next tab ${nextIndex + 1}`);
   } catch (e) {
-    console.error('Refresh failed:', e);
+    //console.error('Refresh failed:', e);
   }
 }
 
@@ -587,7 +587,7 @@ async function validateAllTabs() {
 }
 
 async function recreateTabs() {
-  console.log('[Background] Recreating tabs due to invalid tab IDs');
+  //console.log('[Background] Recreating tabs due to invalid tab IDs');
 
   // First, check which tabs are still valid
   const validTabs = await validateAllTabs();
@@ -595,13 +595,13 @@ async function recreateTabs() {
   if (validTabs.length === state.config.links.length) {
     // All tabs are valid, update state
     state.tabs = validTabs;
-    console.log('[Background] All tabs are still valid');
+    //console.log('[Background] All tabs are still valid');
     scheduleCurrentLink();
     return;
   }
 
   // Some or all tabs are invalid, recreate the window
-  console.log('[Background] Some tabs are invalid, recreating window');
+  //console.log('[Background] Some tabs are invalid, recreating window');
 
   // Close any remaining valid tabs
   for (const tab of validTabs) {
@@ -629,11 +629,11 @@ async function recreateTabs() {
       await chrome.tabs.update(state.tabs[state.currentTabIndex].id, {active: true});
     }
 
-    console.log('[Background] Tabs recreated successfully');
+    //console.log('[Background] Tabs recreated successfully');
     broadcast();
     scheduleCurrentLink();
   } catch (e) {
-    console.error('[Background] Failed to recreate tabs:', e);
+    //console.error('[Background] Failed to recreate tabs:', e);
     throw e;
   }
 }
@@ -665,13 +665,13 @@ async function switchTab() {
     const tabExists = await validateTab(state.tabs[state.currentTabIndex].id);
 
     if (!tabExists) {
-      console.log('Tab no longer exists, attempting to recreate tabs');
+      //console.log('Tab no longer exists, attempting to recreate tabs');
       await recreateTabs();
       return; // recreateTabs will handle scheduling
     }
 
     await chrome.tabs.update(state.tabs[state.currentTabIndex].id, {active: true});
-    console.log(`Switched to tab ${state.currentTabIndex + 1}`);
+    //console.log(`Switched to tab ${state.currentTabIndex + 1}`);
 
     // Notify new tab it became active
     try {
@@ -683,12 +683,12 @@ async function switchTab() {
     broadcast();
     scheduleCurrentLink();
   } catch (e) {
-    console.error('Switch failed:', e);
+    //console.error('Switch failed:', e);
     // Try to recover by recreating tabs
     try {
       await recreateTabs();
     } catch (recoveryError) {
-      console.error('Recovery failed:', recoveryError);
+      //console.error('Recovery failed:', recoveryError);
       stopKioskMode();
     }
   }
@@ -743,7 +743,7 @@ async function broadcast() {
       }
     } catch (e) {
       // Tab might be closed or not ready for messages
-      console.log(`Failed to send message to tab ${tab.id}:`, e.message);
+      //console.log(`Failed to send message to tab ${tab.id}:`, e.message);
     }
   }
 }
@@ -787,11 +787,11 @@ setInterval(async () => {
 
   const allTabsValid = await validateAllTabsExist();
   if (!allTabsValid) {
-    console.log('[Background] Some tabs are invalid during periodic check, recreating');
+    //console.log('[Background] Some tabs are invalid during periodic check, recreating');
     try {
       await recreateTabs();
     } catch (e) {
-      console.error('[Background] Failed to recreate tabs during periodic check:', e);
+      //console.error('[Background] Failed to recreate tabs during periodic check:', e);
     }
   }
 }, 60000);
@@ -821,7 +821,7 @@ async function forceNextTab() {
 // Exit Chrome process function
 async function exitChromeProcess() {
   try {
-    console.log('Exiting Chrome process...');
+    //console.log('Exiting Chrome process...');
 
     // Stop kiosk mode first
     if (state.isRunning) {
@@ -834,11 +834,11 @@ async function exitChromeProcess() {
       try {
         await chrome.windows.remove(window.id);
       } catch (e) {
-        console.log(`Failed to close window ${window.id}:`, e);
+        //console.log(`Failed to close window ${window.id}:`, e);
       }
     }
   } catch (e) {
-    console.error('Failed to exit Chrome:', e);
+    //console.error('Failed to exit Chrome:', e);
   }
 }
 
@@ -868,9 +868,9 @@ async function sendCurrentStateToTab(tabId) {
 
   try {
     await chrome.tabs.sendMessage(tabId, msg);
-    console.log(`Sent current state to tab ${tabId}`);
+    //console.log(`Sent current state to tab ${tabId}`);
   } catch (e) {
-    console.log(`Failed to send current state to tab ${tabId}:`, e.message);
+    //console.log(`Failed to send current state to tab ${tabId}:`, e.message);
   }
 }
 

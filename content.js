@@ -33,18 +33,18 @@ function initializeContentScript() {
   try {
     chrome.runtime.sendMessage({action: 'getStatus'}, (response) => {
       if (chrome.runtime.lastError) {
-        console.log('Extension context invalidated, skipping initialization');
+        //console.log('Extension context invalidated, skipping initialization');
         return;
       }
 
       if (response && response.isRunning) {
-        console.log('Kiosk mode is running, requesting current state');
+        //console.log('Kiosk mode is running, requesting current state');
         // Request the current state to restore buttons and timer
         chrome.runtime.sendMessage({action: 'requestCurrentState'});
       }
     });
   } catch (e) {
-    console.log('Failed to initialize content script:', e);
+    //console.log('Failed to initialize content script:', e);
   }
 }
 
@@ -54,7 +54,7 @@ if (document.readyState === 'loading') {
     initializeContentScript();
     // Force create button for testing
     setTimeout(() => {
-      console.log('Force creating button after DOM ready');
+      //console.log('Force creating button after DOM ready');
       createControlButtons();
     }, 1000);
   });
@@ -62,7 +62,7 @@ if (document.readyState === 'loading') {
   initializeContentScript();
   // Force create button for testing
   setTimeout(() => {
-    console.log('Force creating button immediately');
+    //console.log('Force creating button immediately');
     createControlButtons();
   }, 1000);
 }
@@ -74,27 +74,27 @@ chrome.runtime.onMessage.addListener((req) => {
     unlockPassword = req.unlockPassword || '';
     // Only update unlocked state from background if it's explicitly provided and different
     if (req.hasOwnProperty('unlocked') && req.unlocked !== unlocked) {
-      console.log('Updating unlocked state from background:', req.unlocked);
+      //console.log('Updating unlocked state from background:', req.unlocked);
       unlocked = req.unlocked;
     }
     // Update pause state from background
     if (req.hasOwnProperty('isPaused')) {
-      console.log('Updating pause state from background:', req.isPaused);
+      //console.log('Updating pause state from background:', req.isPaused);
       isPaused = req.isPaused;
     }
     // Update hover mode state from background
     if (req.hasOwnProperty('hoverModeEnabled')) {
-      console.log('Updating hover mode from background:', req.hoverModeEnabled);
+      //console.log('Updating hover mode from background:', req.hoverModeEnabled);
       hoverModeEnabled = req.hoverModeEnabled;
     }
     // Update allow clicks state from background
     if (req.hasOwnProperty('allowClicks')) {
-      console.log('Updating allow clicks from background:', req.allowClicks);
+      //console.log('Updating allow clicks from background:', req.allowClicks);
       allowClicksForThisLink = req.allowClicks;
     }
     // Update escape key settings from background
     if (req.hasOwnProperty('escapeEnabled')) {
-      console.log('Updating escape settings from background:', req.escapeEnabled, req.escapeFrequency, req.escapeMaxTimes);
+      //console.log('Updating escape settings from background:', req.escapeEnabled, req.escapeFrequency, req.escapeMaxTimes);
       escapeEnabled = req.escapeEnabled;
       escapeFrequency = req.escapeFrequency || 10;
       escapeMaxTimes = req.escapeMaxTimes || 5;
@@ -198,7 +198,7 @@ function schedule() {
   if (!blocked) {
     timer = setTimeout(() => {
       blocked = true;
-      console.log('Click blocking activated');
+      //console.log('Click blocking activated');
       showBlockNotification();
       updateBlockingOverlay();
     }, after - elapsed);
@@ -348,14 +348,14 @@ const block = (e) => {
 
   // Don't block if unlocked or clicks are allowed for this link
   if (unlocked || allowClicksForThisLink) {
-    console.log('Interaction allowed - unlocked:', unlocked, 'allowClicks:', allowClicksForThisLink);
+    //console.log('Interaction allowed - unlocked:', unlocked, 'allowClicks:', allowClicksForThisLink);
     trackUserActivity();
     return;
   }
 
   // Block all clicks if unlock is in progress
   if (unlockInProgress) {
-    console.log('Unlock in progress - blocking click');
+    //console.log('Unlock in progress - blocking click');
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
@@ -464,12 +464,12 @@ function createControlButtons() {
   // Only create control buttons in the main frame
   if (!isMainFrame) return;
 
-  console.log('createControlButtons called, start:', start, 'kiosk running checks');
+  //console.log('createControlButtons called, start:', start, 'kiosk running checks');
 
   // Check if menu button already exists
   const existingMenu = document.getElementById('kiosk-menu-button');
   if (existingMenu) {
-    console.log('Menu button already exists, updating');
+    //console.log('Menu button already exists, updating');
     menuButton = existingMenu;
     updateMenuButton();
     return;
@@ -479,7 +479,7 @@ function createControlButtons() {
   removeControlButtons();
 
   // Create button even without start time for testing
-  console.log('Creating new menu button (forcing creation for debugging)');
+  //console.log('Creating new menu button (forcing creation for debugging)');
 
   // Create main round menu button with timer
   menuButton = document.createElement('div');
@@ -546,7 +546,7 @@ function createControlButtons() {
   createMenuContainer();
 
   document.body.appendChild(menuButton);
-  console.log('Menu button added to DOM');
+  //console.log('Menu button added to DOM');
   updateMenuButton();
 }
 
@@ -787,7 +787,7 @@ function attemptUnlock() {
       performUnlock();
     } else if (enteredPassword !== null) { // null means user cancelled
       showIncorrectPasswordNotification();
-      console.log('Incorrect password entered');
+      //console.log('Incorrect password entered');
       // Reset click count on failed password
       unlockClickCount = 0;
       unlockInProgress = false;
@@ -800,7 +800,7 @@ function attemptUnlock() {
 }
 
 function performUnlock() {
-  console.log('performUnlock called - setting unlocked to true');
+  //console.log('performUnlock called - setting unlocked to true');
   unlocked = true;
   unlockClickCount = 0;
   unlockInProgress = false; // Clear the unlock in progress flag
@@ -1129,9 +1129,9 @@ function enterFullscreen() {
     } else if (element.msRequestFullscreen) {
       element.msRequestFullscreen();
     }
-    console.log('Entered fullscreen mode');
+    //console.log('Entered fullscreen mode');
   } catch (e) {
-    console.error('Failed to enter fullscreen:', e);
+    //console.error('Failed to enter fullscreen:', e);
   }
 }
 
@@ -1146,9 +1146,9 @@ function exitFullscreen() {
     } else if (document.msExitFullscreen) {
       document.msExitFullscreen();
     }
-    console.log('Exited fullscreen mode');
+    //console.log('Exited fullscreen mode');
   } catch (e) {
-    console.error('Failed to exit fullscreen:', e);
+    //console.error('Failed to exit fullscreen:', e);
   }
 }
 
@@ -1177,13 +1177,13 @@ function startEscapeSimulation() {
     return;
   }
 
-  console.log(`Starting escape simulation: frequency=${escapeFrequency}s, maxTimes=${escapeMaxTimes}, currentCount=${escapeCount}`);
+  //console.log(`Starting escape simulation: frequency=${escapeFrequency}s, maxTimes=${escapeMaxTimes}, currentCount=${escapeCount}`);
 
   escapeTimer = setTimeout(() => {
     if (escapeEnabled && escapeCount < escapeMaxTimes && !isPaused) {
       simulateEscapeKey();
       escapeCount++;
-      console.log(`ESC key simulated (${escapeCount}/${escapeMaxTimes})`);
+      //console.log(`ESC key simulated (${escapeCount}/${escapeMaxTimes})`);
 
       // Schedule next escape if we haven't reached max
       if (escapeCount < escapeMaxTimes) {
@@ -1197,7 +1197,7 @@ function stopEscapeSimulation() {
   if (escapeTimer) {
     clearTimeout(escapeTimer);
     escapeTimer = null;
-    console.log('Escape simulation stopped');
+    //console.log('Escape simulation stopped');
   }
 }
 
@@ -1225,13 +1225,13 @@ function simulateEscapeKey() {
   });
 
   document.dispatchEvent(escapeEventUp);
-  console.log('ESC key event dispatched');
+  //console.log('ESC key event dispatched');
 }
 
 // Reset escape counter when tab becomes active
 function resetEscapeCounter() {
   escapeCount = 0;
-  console.log('Escape counter reset');
+  //console.log('Escape counter reset');
 }
 
 // Clean up on page unload
