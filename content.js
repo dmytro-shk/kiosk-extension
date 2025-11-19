@@ -714,7 +714,16 @@ function toggleHoverMode() {
   if (hoverModeEnabled) {
     showNotification('Hover Mode Enabled - Hover allowed, clicks blocked', 'rgba(138, 43, 226, 0.9)');
   } else {
-    showNotification('Hover Mode Disabled - All interactions blocked', 'rgba(220, 53, 69, 0.9)');
+    // Check if interactions will actually be blocked when hover mode is disabled
+    if (isPaused) {
+      showNotification('Hover Mode Disabled - All interactions will be blocked after resume', 'rgba(220, 53, 69, 0.9)');
+    } else if (allowClicksForThisLink) {
+      showNotification('Hover Mode Disabled - Clicks still allowed for this link', 'rgba(220, 53, 69, 0.9)');
+    } else if (unlocked) {
+      showNotification('Hover Mode Disabled - Clicks still unlocked', 'rgba(220, 53, 69, 0.9)');
+    } else {
+      showNotification('Hover Mode Disabled - All interactions blocked', 'rgba(220, 53, 69, 0.9)');
+    }
   }
 
   // Update button text in menu
