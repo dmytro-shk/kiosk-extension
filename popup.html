@@ -159,10 +159,17 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
 <!-- Fixed Footer Section -->
 <div class="footer-section">
-  <div class="buttons" style="margin:0">
+  <div class="buttons" style="margin:0 0 10px 0">
     <button id="saveBtn" class="btn-secondary">Save Settings</button>
   </div>
+  <div class="buttons" style="margin:0">
+    <button id="exportBtn" class="btn-secondary">📤 Export Settings</button>
+    <button id="importBtn" class="btn-secondary">📥 Import Settings</button>
+  </div>
 </div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="importFileInput" accept=".json" style="display: none;">
 
 <script src="popup.js"></script>
 </body>

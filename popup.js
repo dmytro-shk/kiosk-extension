@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ['saveBtn', 'startBtn', 'stopBtn', 'status', 'addLinkBtn', 'linksContainer',
    'kioskMode', 'autoStart', 'unlockPassword', 'lockScreen', 'lockPassword',
    'unlockBtn', 'lockError', 'togglePassword', 'eyeIcon', 'toggleSettingsPassword',
-   'settingsEyeIcon'].forEach(id => {
+   'settingsEyeIcon', 'exportBtn', 'importBtn', 'importFileInput'].forEach(id => {
     el[id] = document.getElementById(id);
   });
 
@@ -40,7 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   el.stopBtn.addEventListener('click', () => msg('stop'));
   el.addLinkBtn.addEventListener('click', addLink);
-
+  el.exportBtn.addEventListener('click', exportSettings);
+  el.importBtn.addEventListener('click', () => el.importFileInput.click());
+  el.importFileInput.addEventListener('change', importSettings);
 
   // Track user activity for auto-continue
   document.addEventListener('click', updateActivity);
@@ -540,5 +542,146 @@ function valid(url) {
   }
 }
 
+// Export settings to JSON file
+function exportSettings() {
+  try {
+    // Create export data with current state
+    const exportData = {
+      version: "1.0",
+      exportDate: new Date().toISOString(),
+      config: {
+        links: state.links,
+        kioskMode: state.config.kioskMode,
+        autoStart: state.config.autoStart,
+        unlockPassword: state.config.unlockPassword
+      }
+    };
+
+    // Create JSON blob
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    // Create download link
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = `kiosk-settings-${new Date().toISOString().split('T')[0]}.json`;
+    downloadLink.style.display = 'none';
+
+    // Trigger download
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
+
+    alert('Settings exported successfully!');
+  } catch (error) {
+    //console.error('Export failed:', error);
+    alert('Failed to export settings: ' + error.message);
+  }
+}
+
+// Import settings from JSON file
+function importSettings(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const importData = JSON.parse(e.target.result);
+
+      // Validate imported data
+      if (!validateImportData(importData)) {
+        alert('Invalid settings file format');
+        return;
+      }
+
+      // Show confirmation dialog
+      const confirmMsg = `Import settings from ${importData.exportDate ? new Date(importData.exportDate).toLocaleDateString() : 'unknown date'}?\n\nThis will replace your current configuration.`;
+      if (!confirm(confirmMsg)) return;
+
+      // Apply imported settings
+      if (importData.config) {
+        // Update state with imported data
+        if (importData.config.links) {
+          state.links = importData.config.links;
+        }
+
+        // Update global settings
+        state.config = {
+          ...state.config,
+          kioskMode: importData.config.kioskMode || false,
+          autoStart: importData.config.autoStart || false,
+          unlockPassword: importData.config.unlockPassword || ''
+        };
+
+        // Ensure all links have required fields with defaults
+        state.links = state.links.map(link => ({
+          id: link.id || (Date.now() + '_' + Math.floor(Math.random() * 10000)),
+          url: link.url || 'https://',
+          switchInterval: link.switchInterval || 30,
+          refreshBeforeSwitch: link.refreshBeforeSwitch || 5,
+          refreshEnabled: link.refreshEnabled !== undefined ? link.refreshEnabled : true,
+          blockClicksAfter: link.blockClicksAfter || 120,
+          allowClicks: link.allowClicks || false,
+          escapeEnabled: link.escapeEnabled || false,
+          escapeFrequency: link.escapeFrequency || 10,
+          escapeMaxTimes: link.escapeMaxTimes || 5
+        }));
+
+        // Save imported settings
+        save();
+
+        // Refresh UI
+        loadGlobalSettings();
+        renderLinks();
+
+        alert('Settings imported successfully!');
+      }
+    } catch (error) {
+      //console.error('Import failed:', error);
+      alert('Failed to import settings: ' + error.message);
+    } finally {
+      // Clear file input
+      event.target.value = '';
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+// Validate imported data structure
+function validateImportData(data) {
+  try {
+    // Check basic structure
+    if (!data || typeof data !== 'object') return false;
+    if (!data.config || typeof data.config !== 'object') return false;
+
+    // Validate links if present
+    if (data.config.links) {
+      if (!Array.isArray(data.config.links)) return false;
+
+      // Check each link has required fields
+      for (const link of data.config.links) {
+        if (!link || typeof link !== 'object') return false;
+        if (!link.url || typeof link.url !== 'string') return false;
+
+        // Validate numeric fields
+        const numFields = ['switchInterval', 'refreshBeforeSwitch', 'blockClicksAfter', 'escapeFrequency', 'escapeMaxTimes'];
+        for (const field of numFields) {
+          if (link[field] !== undefined && (typeof link[field] !== 'number' || link[field] < 0)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  } catch (error) {
+    //console.error('Validation error:', error);
+    return false;
+  }
+}
 
 // Functions are now accessed via event listeners, not global window object
