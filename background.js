@@ -307,7 +307,7 @@ function resumeAllTimers() {
     currentTimer.remaining = currentTimer.pausedAt;
     currentTimer.paused = false;
 
-    // Reschedule the switch timer with the remaining time
+    // Only reschedule if there's time remaining
     const currentLink = state.config.links[state.currentTabIndex];
     if (currentLink && currentTimer.remaining > 0) {
       const remainingMs = currentTimer.remaining * 1000;
@@ -329,6 +329,10 @@ function resumeAllTimers() {
         }, refreshTime);
         console.log(`Resumed: Refresh scheduled in ${refreshTime}ms`);
       }
+    } else if (currentTimer.remaining <= 0) {
+      // If timer expired (0 or less seconds), switch immediately
+      console.log(`Resumed: Timer already expired (${currentTimer.remaining}s remaining), switching tab immediately`);
+      setTimeout(() => switchTab(), 0);
     }
   } else {
     // If no pause info, restart the current link's timer
