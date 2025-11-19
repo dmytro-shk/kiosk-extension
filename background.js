@@ -206,6 +206,34 @@ async function startKioskMode() {
     return;
   }
 
+  // Request permissions for the configured URLs only
+  const urls = state.config.links.map(link => {
+    try {
+      const url = new URL(link.url);
+      return `${url.protocol}//${url.hostname}/*`;
+    } catch (e) {
+      console.warn(`Invalid URL: ${link.url}`);
+      return null;
+    }
+  }).filter(Boolean);
+
+  if (urls.length > 0) {
+    try {
+      const hasPermissions = await chrome.permissions.request({
+        origins: urls
+      });
+
+      if (!hasPermissions) {
+        console.error('Required permissions not granted');
+        return;
+      }
+      console.log('Permissions granted for:', urls);
+    } catch (e) {
+      console.error('Permission request failed:', e);
+      return;
+    }
+  }
+
   state.isRunning = true;
   state.isPaused = false;
   state.startTime = Date.now();
@@ -214,9 +242,9 @@ async function startKioskMode() {
   initializeLinkTimers();
 
   try {
-    const urls = state.config.links.map(link => link.url);
+    const tabUrls = state.config.links.map(link => link.url);
     const win = await chrome.windows.create({
-      url: urls,
+      url: tabUrls,
       focused: true,
       state: state.config.kioskMode ? 'fullscreen' : 'maximized'
     });
@@ -233,7 +261,7 @@ async function startKioskMode() {
   }
 }
 
-function stopKioskMode() {
+async function stopKioskMode() {
   state.isRunning = false;
   state.isPaused = false;
   state.startTime = null;
@@ -245,6 +273,27 @@ function stopKioskMode() {
 
   state.tabs.forEach(t => chrome.tabs.remove(t.id).catch(() => {}));
   state.tabs = [];
+
+  // Optional: Remove permissions when stopping (uncomment if you want to revoke permissions)
+  // if (state.config.links && state.config.links.length > 0) {
+  //   const urls = state.config.links.map(link => {
+  //     try {
+  //       const url = new URL(link.url);
+  //       return `${url.protocol}//${url.hostname}/*`;
+  //     } catch (e) {
+  //       return null;
+  //     }
+  //   }).filter(Boolean);
+  //
+  //   if (urls.length > 0) {
+  //     try {
+  //       await chrome.permissions.remove({ origins: urls });
+  //       console.log('Permissions revoked for:', urls);
+  //     } catch (e) {
+  //       console.warn('Failed to revoke permissions:', e);
+  //     }
+  //   }
+  // }
 }
 
 function initializeLinkTimers() {
