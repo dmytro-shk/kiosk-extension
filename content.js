@@ -117,6 +117,11 @@ chrome.runtime.onMessage.addListener((req) => {
   } else if (req.action === 'updatePauseState') {
     isPaused = req.isPaused;
     updateButtonVisibility();
+    // Update menu if visible to show/hide next tab button
+    if (menuVisible && menuContainer) {
+      hideMenu();
+      showMenu();
+    }
     if (isPaused) {
       // Clear any existing timers when paused globally
       if (timer) clearTimeout(timer);
@@ -537,7 +542,10 @@ function createMenuContainer() {
   // Create menu buttons
   const buttons = [
     { id: 'pause', text: isPaused ? '▶️ Resume' : '⏸️ Pause', action: togglePause },
-    { id: 'next', text: '⏭️ Next', action: switchToNextTab },
+    // Only show next tab button when not paused
+    ...(!isPaused ? [
+      { id: 'next', text: '⏭️ Next', action: switchToNextTab }
+    ] : []),
     { id: 'hover', text: hoverModeEnabled ? '🚫 Disable Hover' : '👆 Enable Hover', action: toggleHoverMode },
     { id: 'lock', text: unlocked ? '🔒 Lock' : '🔓 Unlock', action: unlocked ? performLock : attemptUnlock },
     ...(unlocked ? [
