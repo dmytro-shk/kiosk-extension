@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Kiosk Tab Rotator Pro",
-  "version": "1.0.0",
+  "name": "Kiosk Tab Rotator",
+  "version": "1.1.0",
   "description": "Automatically rotates between multiple tabs with individual timers and advanced control features",
   "permissions": ["tabs", "storage", "scripting", "webNavigation", "windows", "activeTab"],
   "optional_host_permissions": ["<all_urls>"],

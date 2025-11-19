@@ -35,14 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
   el.saveBtn.addEventListener('click', save);
   el.startBtn.addEventListener('click', () => {
     msg('start');
-    // Lock the UI after starting if password is set
-    setTimeout(() => {
-      savedPassword = state.config.unlockPassword || '';
-      if (savedPassword) {
-        isUILocked = true;
-        showLockScreen();
-      }
-    }, 100);
+    // Removed UI locking - settings can be changed while kiosk is running
+    // Password is still used for content script unlocking (5-click sequence)
   });
   el.stopBtn.addEventListener('click', () => msg('stop'));
   el.addLinkBtn.addEventListener('click', addLink);
