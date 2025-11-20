@@ -977,6 +977,11 @@ const interactive = (el) => {
 const blockKey = (e) => {
   if (unlocked || isPaused || allowClicksForThisLink) return;
 
+  // Allow simulated escape events to bypass blocking
+  if (e.key === 'Escape' && e.isTrusted === false) {
+    return; // Don't block simulated escape events
+  }
+
   const shouldBlock = blocked &&
                      (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32);
 
@@ -984,8 +989,15 @@ const blockKey = (e) => {
     return block(e);
   }
 
-  // Also block common navigation keys when blocked
-  if (blocked && ['Tab', 'Escape', 'F5', 'F11', 'F12'].includes(e.key)) {
+  // Block other navigation keys when blocked
+  if (blocked && ['Tab', 'F5', 'F11', 'F12'].includes(e.key)) {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }
+
+  // Block real user Escape key presses
+  if (blocked && e.key === 'Escape' && e.isTrusted === true) {
     e.preventDefault();
     e.stopPropagation();
     return false;
